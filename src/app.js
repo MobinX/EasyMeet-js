@@ -78,12 +78,23 @@ const response = await fetch("https://virsys.metered.live/api/v1/turn/credential
     });
 
     let _localVideoPlayer = document.getElementById('localVideoCtr');
+    let localScreenVideoCtr = document.getElementById('localScreenVideoCtr');
+
     webRt.onCameraVideoStateChange((state,stream) => {
         if (state) {
             _localVideoPlayer.srcObject = stream;
         }
         else {
             _localVideoPlayer.srcObject = null;
+        }
+        
+    })
+    webRt.onScreenShareVideoStateChange((state,stream) => {
+        if (state) {
+            localScreenVideoCtr.srcObject = stream;
+        }
+        else {
+            localScreenVideoCtr.srcObject = null;
         }
         
     })

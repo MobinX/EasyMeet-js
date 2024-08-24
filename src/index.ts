@@ -200,6 +200,12 @@ export default class WebrtcBase {
 
           this._updatePeerState();
         }
+        event.track.onunmute = () => {
+          this._updatePeerState();
+        }
+        event.track.onmute = () => {
+          this._updatePeerState();
+        }
       };
       this._peers_ids[connid] = connid;
       this._peerConnections[connid] = connection;
@@ -414,15 +420,18 @@ export default class WebrtcBase {
           socketId: connid,
           info: this._peersInfo[connid],
           isAudioOn:
-            this._remoteAudioStreams[connid] != null &&
-            this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.enabled,
-          isVideoOn:
-            this._remoteVideoStreams[connid] != null &&
-            this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.enabled,
-          isScreenShareOn:
-            this._remoteScreenShareStreams[connid] != null &&
-            this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
-              ?.enabled,
+          this._remoteAudioStreams[connid] != null &&
+          this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.enabled &&
+          !this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.muted,
+        isVideoOn:
+          this._remoteVideoStreams[connid] != null &&
+          this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.enabled &&
+          !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
+        isScreenShareOn:
+          this._remoteScreenShareStreams[connid] != null &&
+          this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
+            ?.enabled &&
+          !this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted,
           audioStream: this._remoteAudioStreams[connid],
           videoStream: this._remoteVideoStreams[connid],
           screenShareStream: this._remoteScreenShareStreams[connid],
