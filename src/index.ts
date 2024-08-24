@@ -443,6 +443,76 @@ export default class WebrtcBase {
     this._onPeerStateChanged.forEach((fn) => fn(peerProperties));
   }
 
+  getAllPeerDetails() {
+    let peerProperties: {
+        socketId: string;
+        info: any;
+        isAudioOn: boolean;
+        isVideoOn: boolean;
+        isScreenShareOn: boolean;
+        audioStream: MediaStream | null;
+        videoStream: MediaStream | null;
+        screenShareStream: MediaStream | null;
+        isPolite: boolean;
+      }[] = [];
+      for (let connid in this._peerConnections) {
+        if (this._peerConnections[connid]) {
+          peerProperties.push({
+            socketId: connid,
+            info: this._peersInfo[connid],
+            isAudioOn:
+            this._remoteAudioStreams[connid] != null &&
+            this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.enabled &&
+            !this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.muted,
+          isVideoOn:
+            this._remoteVideoStreams[connid] != null &&
+            this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.enabled &&
+            !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
+          isScreenShareOn:
+            this._remoteScreenShareStreams[connid] != null &&
+            this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
+              ?.enabled &&
+            !this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted,
+            audioStream: this._remoteAudioStreams[connid],
+            videoStream: this._remoteVideoStreams[connid],
+            screenShareStream: this._remoteScreenShareStreams[connid],
+            isPolite: this._politePeerStates[connid],
+          });
+        }
+      }
+
+      return peerProperties;
+
+  }
+
+  getPeerDetailsById(connid: string) {
+    if (this._peerConnections[connid]) {
+        return ({
+          socketId: connid,
+          info: this._peersInfo[connid],
+          isAudioOn:
+          this._remoteAudioStreams[connid] != null &&
+          this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.enabled &&
+          !this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.muted,
+        isVideoOn:
+          this._remoteVideoStreams[connid] != null &&
+          this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.enabled &&
+          !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
+        isScreenShareOn:
+          this._remoteScreenShareStreams[connid] != null &&
+          this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
+            ?.enabled &&
+          !this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted,
+          audioStream: this._remoteAudioStreams[connid],
+          videoStream: this._remoteVideoStreams[connid],
+          screenShareStream: this._remoteScreenShareStreams[connid],
+          isPolite: this._politePeerStates[connid],
+        });
+      }
+      else return null;
+  }
+   
+
   _AlterAudioVideoSenders(track: MediaStreamTrack, rtpSenders: any) {
     for (let conId in this._peers_ids) {
       if (
@@ -642,6 +712,20 @@ export default class WebrtcBase {
     if (this._isAudioMuted) await this.startAudio();
     else await this.stopAudio();
   }
+
+  isLocalAudioOn() {
+    return !this._isAudioMuted;
+  }
+
+  isLocalVideoOn() {
+    return !this._isVideoMuted;
+  }
+
+  isLocalScreenShareOn() {
+    return !this._isScreenShareMuted;
+  }
+
+
 
   // callback handlers
   onError(fn: Function) {
