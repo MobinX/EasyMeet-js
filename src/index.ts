@@ -212,15 +212,14 @@ export default class WebrtcBase {
       if (this._videoTrack) {
         this._AlterAudioVideoSenders(this._videoTrack, this._rtpVideoSenders);
       }
+      if (this._screenShareTrack) {
+        this._serverFn(
+          JSON.stringify({ screenShareTrackId: this._screenShareTrack.id }),
+          connid
+        );
+      }
       if (this._audioTrack) {
         this._AlterAudioVideoSenders(this._audioTrack, this._rtpAudioSenders);
-      }
-
-      if (this._screenShareTrack) {
-        this._AlterAudioVideoSenders(
-          this._screenShareTrack,
-          this._rtpScreenShareSenders
-        );
       }
 
       this._updatePeerState();
@@ -325,6 +324,15 @@ export default class WebrtcBase {
     } else if (msg.screenShareTrackId) {
       console.log(from_connid, " screenShareTrackId", msg.screenShareTrackId);
       this._remoteScreenShareTrackIds[from_connid] = msg.screenShareTrackId;
+      this._serverFn(JSON.stringify({ startSendingScreen: true }), from_connid);
+    } else if (msg.startSendingScreen) {
+      console.log(from_connid, " startSendingScreen", msg.startSendingScreen);
+      if (this._screenShareTrack && !this._isScreenShareMuted) {
+        this._AlterAudioVideoSenders(
+          this._screenShareTrack,
+          this._rtpScreenShareSenders
+        );
+      }
     }
   }
 
@@ -564,8 +572,6 @@ export default class WebrtcBase {
       // }
       this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
       if (screenStream && screenStream.getVideoTracks().length > 0) {
-        // set the screen share track label as "screen"
-        // screenStream.getVideoTracks()[0].label = "screen"
         this._screenShareTrack = screenStream.getVideoTracks()[0];
         this._emitScreenShareState(true);
         for (let connid in this._peerConnections)
@@ -573,14 +579,7 @@ export default class WebrtcBase {
             JSON.stringify({ screenShareTrackId: this._screenShareTrack.id }),
             connid
           );
-        setTimeout(() => {
-          if (this._screenShareTrack) {
-            this._AlterAudioVideoSenders(
-              this._screenShareTrack,
-              this._rtpScreenShareSenders
-            );
-          }
-        }, 2000);
+       
       }
       this._isScreenShareMuted = false;
     } catch (e) {
