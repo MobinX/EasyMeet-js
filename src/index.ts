@@ -26,6 +26,8 @@ export default class WebrtcBase {
   private _peers_ids: { [id: string]: string | null } = {};
   private _peersInfo: { [id: string]: any | null } = {};
   private _politePeerStates: { [id: string]: boolean } = {};
+  private _remoteScreenShareTrackIds: { [id: string]: string | null } = {};
+
   private _offferMakingStatePeers: { [id: string]: boolean } = {};
 
   // remote tracks
@@ -45,7 +47,6 @@ export default class WebrtcBase {
   private _my_connid: string = "";
 
   private _dataChannels: { [id: string]: RTCDataChannel | null } = {};
-
 
   // callback functions array
 
@@ -104,45 +105,43 @@ export default class WebrtcBase {
         }
       };
 
-         if(politePeerState){
-            this._dataChannels[connid] = connection.createDataChannel(connid);
-            this._dataChannels[connid].onopen = () => {
-              console.log(connid + " data channel onopen");
-            };
-            this._dataChannels[connid].onclose = () => {
-              console.log(connid + " data channel onclose");
-            };
-            this._dataChannels[connid].onmessage = (event) => {
-              console.log(connid + " data channel onmessage", event.data);
-              this._emitDataChannelMsgCallback(connid, event.data);
-            };
-            this._dataChannels[connid].onerror = (event) => {
-              console.log(connid + " data channel onerror", event);
-              this._emitError("Data Channel Error");
-            };
-        }
-  
-        //create data channel
-        connection.ondatachannel = (event) => {
-          console.log(connid + " ondatachannel", event);
-          this._dataChannels[connid] = event.channel;
-          this._dataChannels[connid].onopen = () => {
-            console.log(connid + " data channel onopen");
-          };
-          this._dataChannels[connid].onclose = () => {
-            console.log(connid + " data channel onclose");
-          };
-          this._dataChannels[connid].onmessage = (event) => {
-            console.log(connid + " data channel onmessage", event.data);
-            this._emitDataChannelMsgCallback(connid, event.data);
-          };
-          this._dataChannels[connid].onerror = (event) => {
-            console.log(connid + " data channel onerror", event);
-            this._emitError("Data Channel Error");
-          };
+      if (politePeerState) {
+        this._dataChannels[connid] = connection.createDataChannel(connid);
+        this._dataChannels[connid].onopen = () => {
+          console.log(connid + " data channel onopen");
         };
-  
+        this._dataChannels[connid].onclose = () => {
+          console.log(connid + " data channel onclose");
+        };
+        this._dataChannels[connid].onmessage = (event) => {
+          console.log(connid + " data channel onmessage", event.data);
+          this._emitDataChannelMsgCallback(connid, event.data);
+        };
+        this._dataChannels[connid].onerror = (event) => {
+          console.log(connid + " data channel onerror", event);
+          this._emitError("Data Channel Error");
+        };
+      }
 
+      //create data channel
+      connection.ondatachannel = (event) => {
+        console.log(connid + " ondatachannel", event);
+        this._dataChannels[connid] = event.channel;
+        this._dataChannels[connid].onopen = () => {
+          console.log(connid + " data channel onopen");
+        };
+        this._dataChannels[connid].onclose = () => {
+          console.log(connid + " data channel onclose");
+        };
+        this._dataChannels[connid].onmessage = (event) => {
+          console.log(connid + " data channel onmessage", event.data);
+          this._emitDataChannelMsgCallback(connid, event.data);
+        };
+        this._dataChannels[connid].onerror = (event) => {
+          console.log(connid + " data channel onerror", event);
+          this._emitError("Data Channel Error");
+        };
+      };
 
       connection.onnegotiationneeded = async (event) => {
         console.log(connid + " onnegotiationneeded", event);
@@ -171,10 +170,17 @@ export default class WebrtcBase {
         if (!this._remoteAudioStreams[connid]) {
           this._remoteAudioStreams[connid] = new MediaStream();
         }
+        if (!this._remoteScreenShareStreams[connid]) {
+          this._remoteScreenShareStreams[connid] = new MediaStream();
+        }
 
         if (event.track.kind == "video") {
-          if (event.track.label == "screen") {
-            this._remoteScreenShareStreams[connid] = new MediaStream();
+          if (this._remoteScreenShareTrackIds[connid] == event.track.id) {
+            this._remoteScreenShareStreams[connid]
+              .getVideoTracks()
+              .forEach((t) =>
+                this._remoteScreenShareStreams[connid]?.removeTrack(t)
+              );
             this._remoteScreenShareStreams[connid].addTrack(event.track);
           } else {
             this._remoteVideoStreams[connid]
@@ -209,6 +215,7 @@ export default class WebrtcBase {
       if (this._audioTrack) {
         this._AlterAudioVideoSenders(this._audioTrack, this._rtpAudioSenders);
       }
+
       if (this._screenShareTrack) {
         this._AlterAudioVideoSenders(
           this._screenShareTrack,
@@ -315,6 +322,9 @@ export default class WebrtcBase {
         console.log(err);
         this._emitError("falled to set remote description");
       }
+    } else if (msg.screenShareTrackId) {
+      console.log(from_connid, " screenShareTrackId", msg.screenShareTrackId);
+      this._remoteScreenShareTrackIds[from_connid] = msg.screenShareTrackId;
     }
   }
 
@@ -367,15 +377,14 @@ export default class WebrtcBase {
       }
       return;
     }
-      this._dataChannels[conId]?.send(JSON.stringify(msg));
-
+    this._dataChannels[conId]?.send(JSON.stringify(msg));
   }
 
   onDataChannelMsg(fn: Function) {
     this._onDataChannelMsgCallback.push(fn);
   }
 
-  _emitDataChannelMsgCallback(conId:string, msg:any) {
+  _emitDataChannelMsgCallback(conId: string, msg: any) {
     this._onDataChannelMsgCallback.forEach((fn) => fn(conId, msg));
   }
 
@@ -559,11 +568,19 @@ export default class WebrtcBase {
         // screenStream.getVideoTracks()[0].label = "screen"
         this._screenShareTrack = screenStream.getVideoTracks()[0];
         this._emitScreenShareState(true);
-        if (this._screenShareTrack)
-          this._AlterAudioVideoSenders(
-            this._screenShareTrack,
-            this._rtpScreenShareSenders
+        for (let connid in this._peerConnections)
+          this._serverFn(
+            JSON.stringify({ screenShareTrackId: this._screenShareTrack.id }),
+            connid
           );
+        setTimeout(() => {
+          if (this._screenShareTrack) {
+            this._AlterAudioVideoSenders(
+              this._screenShareTrack,
+              this._rtpScreenShareSenders
+            );
+          }
+        }, 2000);
       }
       this._isScreenShareMuted = false;
     } catch (e) {
@@ -576,6 +593,11 @@ export default class WebrtcBase {
     this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
     this._emitScreenShareState(false);
     this._isScreenShareMuted = true;
+  }
+
+  async toggleScreenShare() {
+    if (this._isScreenShareMuted) await this.startScreenShare();
+    else this.stopScreenShare();
   }
 
   async startAudio() {

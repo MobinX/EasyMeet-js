@@ -96,6 +96,10 @@ const response = await fetch("https://virsys.metered.live/api/v1/turn/credential
       await  webRt.toggleCamera();
     });
 
+    $("#btnStartStopScreenshare").on('click', async function () {
+        await webRt.toggleScreenShare();
+    })
+
     webRt.onDataChannelMsg((from, msg) => {
         console.log("onDataChannelMsg", from, msg);
         $("#messages").append("<li>" + from + ": " + msg + "</li>");
@@ -110,7 +114,7 @@ const response = await fetch("https://virsys.metered.live/api/v1/turn/credential
                  if(!remoteElm){
                     AddNewUser(peerstate[peerz].socketId, peerstate[peerz].socketId);
                  }
-                 let video = remoteElm.querySelector('video') , audio = remoteElm.querySelector('audio');
+                 let video = remoteElm.querySelector('.video') , audio = remoteElm.querySelector('audio') ,  screen = remoteElm.querySelector('.screen');
                  if(pr.isAudioOn){
                     if(audio){
                         audio.srcObject = peerstate[peerz].audioStream;
@@ -130,6 +134,17 @@ const response = await fetch("https://virsys.metered.live/api/v1/turn/credential
                  else {
                     if(video){
                         video.srcObject = null;
+                    }
+                 }
+
+                 if(pr.isScreenShareOn){
+                    if(screen){
+                        screen.srcObject = peerstate[peerz].screenShareStream;
+                    }
+                 }
+                 else {
+                    if(screen){
+                        screen.srcObject = null;
                     }
                  }
                  
