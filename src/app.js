@@ -80,6 +80,49 @@ const response = await fetch("https://virsys.metered.live/api/v1/turn/credential
     let _localVideoPlayer = document.getElementById('localVideoCtr');
     let localScreenVideoCtr = document.getElementById('localScreenVideoCtr');
 
+    webRt.onFileStateChange((fileState) => {
+
+        console.log(fileState);
+        if(document.getElementById('fileprogress'+fileState.fileId) == null){
+            let progress = document.createElement('progress');
+            progress.id = 'fileprogress'+fileState.fileId;
+            progress.value = parseInt(fileState.progress);
+            progress.max = 100;
+            $("#fileprogress").append(progress);   
+        }
+        else{
+            document.getElementById('fileprogress'+fileState.fileId).value = parseInt(fileState.progress);
+        }
+
+        // $("#fileprogress").append(`<div>${(fileState.progress) + "%  " + parseInt(fileState.transferSpeed) + "kb/s" }  </div>`)
+    })
+    webRt.onFileTransferCompleted((fileState, objectURl) => {
+        console.log(fileState, objectURl);
+        $("#fileprogress").append(`<div>Completed</div>`)
+        document.getElementById('fileprogress'+fileState.fileId).value = 100;
+
+        // // $("#fileprogress").append(`<div>${JSON.stringify(fileState)}</div>`)
+        $("#fileprogress").append(`<a href="${objectURl}" download="${fileState.fileName}">${objectURl}</a>`)
+    })
+
+    $("#btnsendfile").on('click',async function () {
+        let file = document.getElementById('fileinput').files[0];
+        console.log(file);
+        (webRt.getAllPeerDetails()).forEach(element => {
+            console.log(element.socketId);
+            webRt.sendFile(element.socketId, file);
+        });
+        
+    });
+    $("#btnsendfile2").on('click',async function () {
+        let file = document.getElementById('fileinput2').files[0];
+        console.log(file);
+        (webRt.getAllPeerDetails()).forEach(element => {
+            console.log(element.socketId);
+            webRt.sendFile(element.socketId, file);
+        });
+    });
+
     webRt.onCameraVideoStateChange((state,stream) => {
         if (state) {
             _localVideoPlayer.srcObject = stream;

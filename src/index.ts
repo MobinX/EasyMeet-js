@@ -14,6 +14,18 @@ interface PeerStateChangedHandler {
   ): void;
 }
 
+interface FileState {
+  fileId: string;
+  totalSize: number;
+  completedSize: number;
+  progress: number;
+  fileName: string;
+  transferSpeed: number;
+  lastTimeStamp: number;
+  peerId: string;
+  receivedArrayBuffer: any[];
+}
+
 export default class WebrtcBase {
   private _iceConfiguration: RTCConfiguration | null = null;
   // local tracks
@@ -29,6 +41,16 @@ export default class WebrtcBase {
   private _remoteScreenShareTrackIds: { [id: string]: string | null } = {};
 
   private _offferMakingStatePeers: { [id: string]: boolean } = {};
+
+  // file transfers
+  private _fileStates: { [fileid: string]: FileState } = {};
+  private _fileTransferingDataChennels: {
+    [fileid: string]: RTCDataChannel | null;
+  } = {};
+  private _fileTransferingPeers: { [fileid: string]: string | null } = {}; // get peer id by file id
+  private _fileSendingReqCallbacks: Function | null = null;
+  private _pendingFiles: { [fileid: string]: any } = {};
+  private _fileTransferingFileReaders: { [fileid: string]: FileReader } = {};
 
   // remote tracks
   private _remoteAudioStreams: { [id: string]: MediaStream | null } = {};
@@ -55,6 +77,8 @@ export default class WebrtcBase {
   private _onAudioStateChanged: Function[] = [];
   private _onPeerStateChanged: PeerStateChangedHandler[] = [];
   private _onDataChannelMsgCallback: Function[] = [];
+  private _onFileStateChanged: Function[] = [];
+  private _onFileTransferCompleted: Function[] = [];
 
   private _onError: Function[] = [];
 
@@ -126,6 +150,44 @@ export default class WebrtcBase {
       //create data channel
       connection.ondatachannel = (event) => {
         console.log(connid + " ondatachannel", event);
+        if (event.channel.label.startsWith("file-")) {
+          let fileid = event.channel.label.replace("file-", "");
+
+          this._fileTransferingDataChennels[fileid] = event.channel;
+          this._fileTransferingDataChennels[fileid].onopen = () => {
+            console.log(connid + "remote file data channel onopen");
+          };
+          this._fileTransferingDataChennels[fileid].onclose = () => {
+            console.log(connid + "remote file data channel onclose");
+          };
+          this._fileTransferingDataChennels[fileid].onmessage = (event) => {
+            console.log(connid + "remote file data channel onmessage ", event.data);
+            this._fileStates[fileid] = {
+              ...this._fileStates[fileid],
+              receivedArrayBuffer: this._fileStates[fileid].receivedArrayBuffer.concat(
+                [event.data]
+              ),
+              completedSize: this._fileStates[fileid].completedSize + event.data.byteLength,
+              progress: (this._fileStates[fileid].completedSize / this._fileStates[fileid].totalSize) * 100,
+              transferSpeed: event.data.byteLength / (Date.now() - this._fileStates[fileid].lastTimeStamp),
+              lastTimeStamp: Date.now(),
+            }
+            this._emitFileStateChange(fileid);
+            if(this._fileStates[fileid].completedSize == this._fileStates[fileid].totalSize) {
+              let contentArrayblob = new Blob(this._fileStates[fileid].receivedArrayBuffer);
+              let objectURL = URL.createObjectURL(contentArrayblob);
+              this._emitFileTransferCompleted(this._fileStates[fileid], objectURL);
+              
+            }
+            
+          };
+          this._fileTransferingDataChennels[fileid].onerror = (event) => {
+            console.log(connid + "file data channel onerror", event);
+            this._emitError("Data Channel Error");
+          };
+
+          return;
+        }
         this._dataChannels[connid] = event.channel;
         this._dataChannels[connid].onopen = () => {
           console.log(connid + " data channel onopen");
@@ -202,10 +264,10 @@ export default class WebrtcBase {
         }
         event.track.onunmute = () => {
           this._updatePeerState();
-        }
+        };
         event.track.onmute = () => {
           this._updatePeerState();
-        }
+        };
       };
       this._peers_ids[connid] = connid;
       this._peerConnections[connid] = connection;
@@ -398,7 +460,188 @@ export default class WebrtcBase {
     this._onDataChannelMsgCallback.push(fn);
   }
 
+  onFileSendingReq(fn: ((name:string, conId:string) => boolean)) {
+    this._fileSendingReqCallbacks = fn;
+  }
+
+  onFileStateChange(fn: ((fileState:FileState) => void)) {
+    this._onFileStateChanged.push(fn);
+  }
+  _emitFileStateChange(fileID:string) {
+    this._onFileStateChanged.forEach((fn) => fn(this._fileStates[fileID]));
+    
+  }
+
+  onFileTransferCompleted(fn: ((fileState:FileState, objectURl:string) => void)) {
+    this._onFileTransferCompleted.push(fn);
+  }
+
+  _emitFileTransferCompleted(fileState:FileState, objectURl:string) {
+    this._onFileTransferCompleted.forEach((fn) => fn(fileState, objectURl));
+  }
+  
+
+
+  sendFile(to: string, file: File) {
+    let fileId = crypto.randomUUID();
+    this._fileStates[fileId] = {
+      fileName: file.name,
+      fileId: fileId,
+      totalSize: file.size,
+      completedSize: 0,
+      progress: 0,
+      lastTimeStamp: 0,
+      transferSpeed: 0,
+      peerId: to,
+      receivedArrayBuffer: [],
+    };
+    this._pendingFiles[fileId] = file;
+    this._dataChannels[to]?.send(
+      JSON.stringify({
+        type: "file_sending_request",
+        data: this._fileStates[fileId],
+      })
+    );
+  }
+
+  _sendFileUsingDataChannel(conId: string, data: FileState, chunkSize = 16384) {
+    try {
+      if (!this._fileTransferingDataChennels[data.fileId]) {
+        if (this._peerConnections[conId]) {
+          this._fileTransferingDataChennels[data.fileId] =
+            this._peerConnections[conId].createDataChannel(
+              "file-" + data.fileId
+            );
+          if (this._fileTransferingDataChennels[data.fileId]) {
+            this._fileTransferingDataChennels[data.fileId]!.onopen = () => {
+              console.log(conId + "file data channel onopen " + data.fileId);
+            };
+            this._fileTransferingDataChennels[data.fileId]!.binaryType =
+              "arraybuffer";
+            this._fileTransferingDataChennels[data.fileId]!.onclose = () => {
+              console.log(conId + "file data channel onclose " + data.fileId);
+              delete this._fileTransferingDataChennels[data.fileId];
+            };
+            this._fileTransferingDataChennels[data.fileId]!.onmessage = (e) => {
+              console.log(conId + "file data channel onmessage " + data.fileId);
+              let msg = JSON.parse(e.data);
+              // this._emitDataChannelMsgCallback(conId, msg);
+            }; // though sender never get msg but sends msg
+
+            this._fileTransferingDataChennels[data.fileId]!.onerror = (e) => {
+              console.log(conId + "file data channel onerror " + data.fileId);
+              this._emitError("Failed to transfer file " + data.fileName);
+            };
+          }
+        } else {
+          this._emitError(
+            "Failed to transfer file " +
+              data.fileName +
+              " because peer is not connected"
+          );
+          return;
+        }
+      }
+      //data channel created or existed , now work with file reader
+      if (this._pendingFiles[data.fileId]) {
+        if (!this._fileTransferingFileReaders[data.fileId]) {
+          this._fileTransferingFileReaders[data.fileId] = new FileReader();
+          this._fileTransferingFileReaders[data.fileId]!.onerror = (e) => {
+            console.log("failed to read file " + data.fileName);
+            this._emitError("Failed to read file " + data.fileName);
+          };
+          this._fileTransferingFileReaders[data.fileId]!.onabort = (e) => {
+            console.log("failed to read file ,aborted " + data.fileName);
+            this._emitError("Failed to read file , aborted " + data.fileName);
+          };
+        }
+        this._fileTransferingFileReaders[data.fileId]!.onload = (e) => {
+          console.log("read file " + data.fileName);
+          if (e.target?.result && typeof e.target?.result != null) {
+            this._fileTransferingDataChennels[data.fileId]?.send(
+              e.target?.result as ArrayBuffer
+            );
+            this._fileStates[data.fileId] = {
+              ...this._fileStates[data.fileId],
+              completedSize:
+                this._fileStates[data.fileId].completedSize + (e.target?.result! as ArrayBuffer).byteLength,
+              progress:
+                (this._fileStates[data.fileId].completedSize /
+                  this._fileStates[data.fileId].totalSize) *
+                100,
+              transferSpeed:
+                (chunkSize * 8) /
+                (Date.now() - this._fileStates[data.fileId].lastTimeStamp),
+              lastTimeStamp: Date.now(),
+            };
+            this._emitFileStateChange(
+              data.fileId
+              
+            );
+            if(this._fileStates[data.fileId].completedSize < this._fileStates[data.fileId].totalSize){
+              readSlice(this._fileStates[data.fileId].completedSize);
+            }
+            if(this._fileStates[data.fileId].completedSize == this._fileStates[data.fileId].totalSize){
+              let contentArrayblob = new Blob(this._fileStates[data.fileId].receivedArrayBuffer);
+              let objectURL = URL.createObjectURL(contentArrayblob);
+              this._emitFileTransferCompleted(this._fileStates[data.fileId], objectURL);
+            }
+          }
+        };
+        const readSlice = (size: number) => {
+          console.log("readSlice ", size);
+          const slice = this._pendingFiles[data.fileId].slice(
+            this._fileStates[data.fileId].completedSize,
+            size + chunkSize
+          );
+          this._fileTransferingFileReaders[data.fileId].readAsArrayBuffer(
+            slice
+          );
+        };
+        readSlice(0);
+      }
+    } catch (e) {
+      this._emitError("Failed to transfer file " + data.fileName);
+      return;
+    }
+  }
+
+  
+
   _emitDataChannelMsgCallback(conId: string, msg: any) {
+    let processedMsg = JSON.parse(msg);
+    if (
+
+      processedMsg.type == "file_sending_request"
+    ) {
+      let shouldContinue = true;
+
+      if (this._fileSendingReqCallbacks) {
+        let shouldContinue = this._fileSendingReqCallbacks(
+          processedMsg.data.name,
+          conId
+        );
+      }
+
+      console.log("shouldContinue", shouldContinue);
+      console.log("oi oiiii",conId)
+      if (shouldContinue) {
+        let fileData: FileState = processedMsg.data;
+        this._fileStates[fileData.fileId] = fileData;
+        console.log("shouldContinue", shouldContinue);
+        this._dataChannels[conId]?.send(
+          JSON.stringify({
+            type: "file_sending_response",
+            data: processedMsg.data,
+          })
+        );
+      }
+    } else if (
+     
+      processedMsg.type == "file_sending_response"
+    ) {
+      this._sendFileUsingDataChannel(conId, processedMsg.data);
+    }
     this._onDataChannelMsgCallback.forEach((fn) => fn(conId, msg));
   }
 
@@ -420,18 +663,18 @@ export default class WebrtcBase {
           socketId: connid,
           info: this._peersInfo[connid],
           isAudioOn:
-          this._remoteAudioStreams[connid] != null &&
-          this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.enabled &&
-          !this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.muted,
-        isVideoOn:
-          this._remoteVideoStreams[connid] != null &&
-          this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.enabled &&
-          !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
-        isScreenShareOn:
-          this._remoteScreenShareStreams[connid] != null &&
-          this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
-            ?.enabled &&
-          !this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted,
+            this._remoteAudioStreams[connid] != null &&
+            this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.enabled &&
+            !this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.muted,
+          isVideoOn:
+            this._remoteVideoStreams[connid] != null &&
+            this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.enabled &&
+            !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
+          isScreenShareOn:
+            this._remoteScreenShareStreams[connid] != null &&
+            this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
+              ?.enabled &&
+            !this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted,
           audioStream: this._remoteAudioStreams[connid],
           videoStream: this._remoteVideoStreams[connid],
           screenShareStream: this._remoteScreenShareStreams[connid],
@@ -445,22 +688,22 @@ export default class WebrtcBase {
 
   getAllPeerDetails() {
     let peerProperties: {
-        socketId: string;
-        info: any;
-        isAudioOn: boolean;
-        isVideoOn: boolean;
-        isScreenShareOn: boolean;
-        audioStream: MediaStream | null;
-        videoStream: MediaStream | null;
-        screenShareStream: MediaStream | null;
-        isPolite: boolean;
-      }[] = [];
-      for (let connid in this._peerConnections) {
-        if (this._peerConnections[connid]) {
-          peerProperties.push({
-            socketId: connid,
-            info: this._peersInfo[connid],
-            isAudioOn:
+      socketId: string;
+      info: any;
+      isAudioOn: boolean;
+      isVideoOn: boolean;
+      isScreenShareOn: boolean;
+      audioStream: MediaStream | null;
+      videoStream: MediaStream | null;
+      screenShareStream: MediaStream | null;
+      isPolite: boolean;
+    }[] = [];
+    for (let connid in this._peerConnections) {
+      if (this._peerConnections[connid]) {
+        peerProperties.push({
+          socketId: connid,
+          info: this._peersInfo[connid],
+          isAudioOn:
             this._remoteAudioStreams[connid] != null &&
             this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.enabled &&
             !this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.muted,
@@ -473,24 +716,23 @@ export default class WebrtcBase {
             this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
               ?.enabled &&
             !this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted,
-            audioStream: this._remoteAudioStreams[connid],
-            videoStream: this._remoteVideoStreams[connid],
-            screenShareStream: this._remoteScreenShareStreams[connid],
-            isPolite: this._politePeerStates[connid],
-          });
-        }
+          audioStream: this._remoteAudioStreams[connid],
+          videoStream: this._remoteVideoStreams[connid],
+          screenShareStream: this._remoteScreenShareStreams[connid],
+          isPolite: this._politePeerStates[connid],
+        });
       }
+    }
 
-      return peerProperties;
-
+    return peerProperties;
   }
 
   getPeerDetailsById(connid: string) {
     if (this._peerConnections[connid]) {
-        return ({
-          socketId: connid,
-          info: this._peersInfo[connid],
-          isAudioOn:
+      return {
+        socketId: connid,
+        info: this._peersInfo[connid],
+        isAudioOn:
           this._remoteAudioStreams[connid] != null &&
           this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.enabled &&
           !this._remoteAudioStreams[connid]?.getAudioTracks()[0]?.muted,
@@ -503,15 +745,13 @@ export default class WebrtcBase {
           this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
             ?.enabled &&
           !this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted,
-          audioStream: this._remoteAudioStreams[connid],
-          videoStream: this._remoteVideoStreams[connid],
-          screenShareStream: this._remoteScreenShareStreams[connid],
-          isPolite: this._politePeerStates[connid],
-        });
-      }
-      else return null;
+        audioStream: this._remoteAudioStreams[connid],
+        videoStream: this._remoteVideoStreams[connid],
+        screenShareStream: this._remoteScreenShareStreams[connid],
+        isPolite: this._politePeerStates[connid],
+      };
+    } else return null;
   }
-   
 
   _AlterAudioVideoSenders(track: MediaStreamTrack, rtpSenders: any) {
     for (let conId in this._peers_ids) {
@@ -658,7 +898,6 @@ export default class WebrtcBase {
             JSON.stringify({ screenShareTrackId: this._screenShareTrack.id }),
             connid
           );
-       
       }
       this._isScreenShareMuted = false;
     } catch (e) {
@@ -724,8 +963,6 @@ export default class WebrtcBase {
   isLocalScreenShareOn() {
     return !this._isScreenShareMuted;
   }
-
-
 
   // callback handlers
   onError(fn: Function) {
