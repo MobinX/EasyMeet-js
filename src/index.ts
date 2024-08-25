@@ -161,25 +161,40 @@ export default class WebrtcBase {
             console.log(connid + "remote file data channel onclose");
           };
           this._fileTransferingDataChennels[fileid].onmessage = (event) => {
-            console.log(connid + "remote file data channel onmessage ", event.data);
+            console.log(
+              connid + "remote file data channel onmessage ",
+              event.data
+            );
             this._fileStates[fileid] = {
               ...this._fileStates[fileid],
-              receivedArrayBuffer: this._fileStates[fileid].receivedArrayBuffer.concat(
-                [event.data]
-              ),
-              completedSize: this._fileStates[fileid].completedSize + event.data.byteLength,
-              progress: (this._fileStates[fileid].completedSize / this._fileStates[fileid].totalSize) * 100,
-              transferSpeed: event.data.byteLength / (Date.now() - this._fileStates[fileid].lastTimeStamp),
+              receivedArrayBuffer: this._fileStates[
+                fileid
+              ].receivedArrayBuffer.concat([event.data]),
+              completedSize:
+                this._fileStates[fileid].completedSize + event.data.byteLength,
+              progress:
+                (this._fileStates[fileid].completedSize /
+                  this._fileStates[fileid].totalSize) *
+                100,
+              transferSpeed:
+                event.data.byteLength /
+                (Date.now() - this._fileStates[fileid].lastTimeStamp),
               lastTimeStamp: Date.now(),
-            }
+            };
             this._emitFileStateChange(fileid);
-            if(this._fileStates[fileid].completedSize == this._fileStates[fileid].totalSize) {
-              let contentArrayblob = new Blob(this._fileStates[fileid].receivedArrayBuffer);
+            if (
+              this._fileStates[fileid].completedSize ==
+              this._fileStates[fileid].totalSize
+            ) {
+              let contentArrayblob = new Blob(
+                this._fileStates[fileid].receivedArrayBuffer
+              );
               let objectURL = URL.createObjectURL(contentArrayblob);
-              this._emitFileTransferCompleted(this._fileStates[fileid], objectURL);
-              
+              this._emitFileTransferCompleted(
+                this._fileStates[fileid],
+                objectURL
+              );
             }
-            
           };
           this._fileTransferingDataChennels[fileid].onerror = (event) => {
             console.log(connid + "file data channel onerror", event);
@@ -301,8 +316,8 @@ export default class WebrtcBase {
         this._offferMakingStatePeers[connid] = true;
         console.log(
           connid +
-            " creating offer: connenction.signalingState:" +
-            connection?.signalingState
+          " creating offer: connenction.signalingState:" +
+          connection?.signalingState
         );
         let offer = await connection?.createOffer();
         await connection?.setLocalDescription(offer);
@@ -330,8 +345,8 @@ export default class WebrtcBase {
       if (!this._peerConnections[from_connid]) {
         console.log(
           "peer " +
-            from_connid +
-            " not found , creating connection for ice candidate"
+          from_connid +
+          " not found , creating connection for ice candidate"
         );
         await this.createConnection(from_connid, false, extraInfo);
       }
@@ -460,27 +475,26 @@ export default class WebrtcBase {
     this._onDataChannelMsgCallback.push(fn);
   }
 
-  onFileSendingReq(fn: ((name:string, conId:string) => boolean)) {
+  onFileSendingReq(fn: (name: string, conId: string) => boolean) {
     this._fileSendingReqCallbacks = fn;
   }
 
-  onFileStateChange(fn: ((fileState:FileState) => void)) {
+  onFileStateChange(fn: (fileState: FileState) => void) {
     this._onFileStateChanged.push(fn);
   }
-  _emitFileStateChange(fileID:string) {
+  _emitFileStateChange(fileID: string) {
     this._onFileStateChanged.forEach((fn) => fn(this._fileStates[fileID]));
-    
   }
 
-  onFileTransferCompleted(fn: ((fileState:FileState, objectURl:string) => void)) {
+  onFileTransferCompleted(
+    fn: (fileState: FileState, objectURl: string) => void
+  ) {
     this._onFileTransferCompleted.push(fn);
   }
 
-  _emitFileTransferCompleted(fileState:FileState, objectURl:string) {
+  _emitFileTransferCompleted(fileState: FileState, objectURl: string) {
     this._onFileTransferCompleted.forEach((fn) => fn(fileState, objectURl));
   }
-  
-
 
   sendFile(to: string, file: File) {
     let fileId = crypto.randomUUID();
@@ -504,7 +518,7 @@ export default class WebrtcBase {
     );
   }
 
-  _sendFileUsingDataChannel(conId: string, data: FileState, chunkSize = 16384) {
+  _sendFileUsingDataChannel(conId: string, data: FileState, chunkSize = 10384) {
     try {
       if (!this._fileTransferingDataChennels[data.fileId]) {
         if (this._peerConnections[conId]) {
@@ -536,8 +550,8 @@ export default class WebrtcBase {
         } else {
           this._emitError(
             "Failed to transfer file " +
-              data.fileName +
-              " because peer is not connected"
+            data.fileName +
+            " because peer is not connected"
           );
           return;
         }
@@ -564,7 +578,8 @@ export default class WebrtcBase {
             this._fileStates[data.fileId] = {
               ...this._fileStates[data.fileId],
               completedSize:
-                this._fileStates[data.fileId].completedSize + (e.target?.result! as ArrayBuffer).byteLength,
+                this._fileStates[data.fileId].completedSize +
+                (e.target?.result! as ArrayBuffer).byteLength,
               progress:
                 (this._fileStates[data.fileId].completedSize /
                   this._fileStates[data.fileId].totalSize) *
@@ -574,26 +589,62 @@ export default class WebrtcBase {
                 (Date.now() - this._fileStates[data.fileId].lastTimeStamp),
               lastTimeStamp: Date.now(),
             };
-            this._emitFileStateChange(
-              data.fileId
-              
-            );
-            if(this._fileStates[data.fileId].completedSize < this._fileStates[data.fileId].totalSize){
+            this._emitFileStateChange(data.fileId);
+            if (
+              this._fileStates[data.fileId].completedSize <
+              this._fileStates[data.fileId].totalSize
+            ) {
               readSlice(this._fileStates[data.fileId].completedSize);
             }
-            if(this._fileStates[data.fileId].completedSize == this._fileStates[data.fileId].totalSize){
-              let contentArrayblob = new Blob(this._fileStates[data.fileId].receivedArrayBuffer);
+            if (
+              this._fileStates[data.fileId].completedSize ==
+              this._fileStates[data.fileId].totalSize
+            ) {
+              let contentArrayblob = new Blob(
+                this._fileStates[data.fileId].receivedArrayBuffer
+              );
+              console.log(
+                "data channel bufferedAmount",
+                this._fileTransferingDataChennels[data.fileId]!.bufferedAmount
+              );
+
               let objectURL = URL.createObjectURL(contentArrayblob);
-              this._emitFileTransferCompleted(this._fileStates[data.fileId], objectURL);
+              this._emitFileTransferCompleted(
+                this._fileStates[data.fileId],
+                objectURL
+              );
             }
           }
         };
         const readSlice = (size: number) => {
           console.log("readSlice ", size);
+          console.log(
+            "data channel bufferedAmount remaining",
+       
+            this._fileTransferingDataChennels[data.fileId]!.bufferedAmount
+          );
+          if (
+            (
+            this._fileTransferingDataChennels[data.fileId]!.bufferedAmount) > 955350
+            
+          ) {
+            // wait until data channel queue is empty by recursively cheking bufferedAmount
+            console.log(
+              "data channel buffer not empty , waiting for empty bufferedAmount"
+            );
+            setTimeout(() => readSlice(size), 50);
+             
+           
+
+            return;
+          }
           const slice = this._pendingFiles[data.fileId].slice(
             this._fileStates[data.fileId].completedSize,
             size + chunkSize
           );
+
+          // before sending next slice , we need to ensure that data channel queue is not full
+
           this._fileTransferingFileReaders[data.fileId].readAsArrayBuffer(
             slice
           );
@@ -606,14 +657,9 @@ export default class WebrtcBase {
     }
   }
 
-  
-
   _emitDataChannelMsgCallback(conId: string, msg: any) {
     let processedMsg = JSON.parse(msg);
-    if (
-
-      processedMsg.type == "file_sending_request"
-    ) {
+    if (processedMsg.type == "file_sending_request") {
       let shouldContinue = true;
 
       if (this._fileSendingReqCallbacks) {
@@ -624,7 +670,7 @@ export default class WebrtcBase {
       }
 
       console.log("shouldContinue", shouldContinue);
-      console.log("oi oiiii",conId)
+      console.log("oi oiiii", conId);
       if (shouldContinue) {
         let fileData: FileState = processedMsg.data;
         this._fileStates[fileData.fileId] = fileData;
@@ -636,10 +682,7 @@ export default class WebrtcBase {
           })
         );
       }
-    } else if (
-     
-      processedMsg.type == "file_sending_response"
-    ) {
+    } else if (processedMsg.type == "file_sending_response") {
       this._sendFileUsingDataChannel(conId, processedMsg.data);
     }
     this._onDataChannelMsgCallback.forEach((fn) => fn(conId, msg));
