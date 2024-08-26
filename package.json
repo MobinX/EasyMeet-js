@@ -1,7 +1,7 @@
 {
   "author": "MobinX",
   "name": "@easymeet/core",
-  "description": "The easiest webrtc, peer to peer video audio calling and file transfering  js , react library",
+  "description": "The easiest WebRTC, peer to peer video, audio calling and file transfering library for React and vanilla JS",
   "version": "1.0.0",
   "license": "MIT",
   "homepage": "https://github.com/MobinX/EasyMeet-js",
@@ -33,10 +33,23 @@
   ],
   "keywords": [
     "react",
-    "peer",
+    "peer to peer calling",
     "webrtc",
     "video call",
-    "audio call"
+    "audio call",
+    "file sharing",
+    "chat",
+    "google meet",
+    "zoom",
+    "facebook meet",
+    "teams",
+    "Real time communication",
+    "WebRTC",
+    "Real time video call",
+    "react webrt"
+
+
+
   ],
   "repository": {
     "type": "git",
