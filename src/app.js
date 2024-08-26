@@ -27,7 +27,7 @@ const response = await fetch("https://virsys.metered.live/api/v1/turn/credential
     const myid = ably.auth.clientId;
     console.log('myid: ', myid);
     const channel = ably.channels.get('quickstart');
-    let webRt =  new WebrtcBase.default(ably.auth.clientId, iceServers ,sendmsg,  );
+    let webRt =  new EasyMeet.WebrtcBase(ably.auth.clientId, iceServers ,sendmsg,  );
     document.title = myid;
 
     async function sendmsg(msg, to) {

@@ -1,17 +1,61 @@
+// {
+//   "compilerOptions": {
+//     "outDir": "./dist",
+//     "allowJs": false,
+//     "target": "es6",
+//     "module": "commonjs",
+//     "allowUnusedLabels": false,
+//     "strict": true,
+//     "sourceMap": true,
+//     "declaration": true,
+//     "declarationDir": "./dist/types",
+//     "esModuleInterop": true
+//   },
+//   "include": ["./src/**/*"]
+// }
+
 {
   "compilerOptions": {
-    "outDir": "./dist",
+        "outDir": "./dist",
     "allowJs": false,
-    "target": "es6",
-    "module": "commonjs",
+    "target": "ES2015",
+    // "module": "commonjs",
     "allowUnusedLabels": false,
-    "strict": true,
-    "sourceMap": true,
-    "declaration": true,
+    // "strict": true,
+    // "sourceMap": true,
+    // "declaration": true,
     "declarationDir": "./dist/types",
-    "esModuleInterop": true
+    // "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "noFallthroughCasesInSwitch": true,
+    // "noUnusedParameters": true,
+    // "noUnusedLocals": true,
+    "declaration": true,
+    "strict": true,
+    // "noUncheckedIndexedAccess": true,
+    "module": "esnext",
+    // "target": "ES2015",
+    "lib": ["ES2021", "dom"],
+    "sourceMap": true,
+    "jsx": "react",
+    "moduleResolution": "node",
+    "rootDir": "src",
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    
+    "baseUrl": "src/",
+    "paths": {
+      "react": ["node_modules/react"],
+      "@easymeet/react": ["src/react/index.ts"]
+    },
+    "typeRoots": ["./src/@types", "./node_modules/@types"],
+    "types": ["node","react",],
   },
-  "include": ["./src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
 }
 
 // {

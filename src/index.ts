@@ -26,7 +26,7 @@ interface FileState {
   receivedArrayBuffer: any[];
 }
 
-export default class WebrtcBase {
+export  class WebrtcBase {
   private _iceConfiguration: RTCConfiguration | null = null;
   // local tracks
   private _audioTrack: MediaStreamTrack | null = null;
@@ -539,6 +539,7 @@ export default class WebrtcBase {
             this._fileTransferingDataChennels[data.fileId]!.onmessage = (e) => {
               console.log(conId + "file data channel onmessage " + data.fileId);
               let msg = JSON.parse(e.data);
+
               // this._emitDataChannelMsgCallback(conId, msg);
             }; // though sender never get msg but sends msg
 
@@ -1015,3 +1016,5 @@ export default class WebrtcBase {
     this._onError.forEach((fn) => fn(error));
   }
 }
+
+

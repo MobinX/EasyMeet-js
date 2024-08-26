@@ -1,22 +1,119 @@
 {
-    "repository": "https://github.com/darkeclipz/html5-typescript-template",
-    "license": "Public Domain",
-    "scripts": {
-        "build": "NODE_OPTIONS=--openssl-legacy-provider webpack ",
-        "start": "concurrently \"NODE_OPTIONS=--openssl-legacy-provider webpack --watch\""
+  "author": "MobinX",
+  "name": "@easymeet/core",
+  "description": "The easiest webrtc, peer to peer video audio calling and file transfering  js , react library",
+  "version": "1.0.0",
+  "license": "MIT",
+  "homepage": "https://github.com/MobinX/EasyMeet-js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "browser": "dist/easy-meet.min.js",
+  "module": "dist/es/index.js",
+  "unpkg": "dist/easy-meet.min.js",
+  "exports": {
+    ".": {
+      "import": "./dist/es/index.js",
+      "require": "./dist/index.js"
     },
-    "devDependencies": {
-        "clean-webpack-plugin": "^4.0.0",
-        "concurrently": "^8.2.2",
-        "copy-webpack-plugin": "^12.0.2",
-        "fork-ts-checker-webpack-plugin": "^9.0.2",
-        "live-server": "^1.2.2",
-        "npm-dts-webpack-plugin": "^1.3.13",
-        "source-map-loader": "latest",
-        "ts-loader": "latest",
-        "typescript": "latest",
-        "webpack": "latest",
-        "webpack-cli": "^5.1.4",
-        "webpack-dev-server": "^5.0.4"
+    "./react": {
+      "import": "./dist/react.es.js",
+      "require": "./dist/react.cjs.js",
+      "types": "./dist/react/index.d.ts"
     }
+  },
+  "files": [
+    "*.md",
+    "dist",
+    "lib",
+    "es",
+    "src/stylesheets"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "keywords": [
+    "react",
+    "peer",
+    "webrtc",
+    "video call",
+    "audio call"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MobinX/EasyMeet-js"
+  },
+  "scripts": {
+    "build": "NODE_OPTIONS=--openssl-legacy-provider webpack ",
+    "start": "concurrently \"NODE_OPTIONS=--openssl-legacy-provider webpack --watch\"",
+    "dev": "rollup -cw"
+  },
+  "devDependencies": {
+    "@babel/core": "latest",
+    "@babel/eslint-parser": "latest",
+    "@babel/helpers": "latest",
+    "@babel/plugin-external-helpers": "latest",
+    "@babel/plugin-proposal-class-properties": "latest",
+    "@babel/preset-env": "latest",
+    "@babel/preset-react": "latest",
+    "@babel/preset-typescript": "latest",
+    "@react-docgen/cli": "latest",
+    "@rollup/plugin-babel": "latest",
+    "@rollup/plugin-commonjs": "latest",
+    "@rollup/plugin-node-resolve": "latest",
+    "@rollup/plugin-terser": "latest",
+    "@rollup/plugin-typescript": "latest",
+    "@testing-library/react": "latest",
+    "@types/eslint": "latest",
+    "@types/jest": "latest",
+    "@types/node": "latest",
+    "@types/react": "^18.3.4",
+    "@typescript-eslint/eslint-plugin": "latest",
+    "@typescript-eslint/parser": "latest",
+    "axe-core": "latest",
+    "babel-jest": "latest",
+    "babel-plugin-transform-react-remove-prop-types": "latest",
+    "clean-webpack-plugin": "latest",
+    "concurrently": "latest",
+    "copy-webpack-plugin": "latest",
+    "core-js": "latest",
+    "eslint": "latest",
+    "eslint-config-prettier": "latest",
+    "eslint-plugin-import": "latest",
+    "eslint-plugin-jest": "latest",
+    "eslint-plugin-react": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-unused-imports": "latest",
+    "fork-ts-checker-webpack-plugin": "latest",
+    "husky": "latest",
+    "jest": "latest",
+    "jest-canvas-mock": "latest",
+    "jest-environment-jsdom": "latest",
+    "lint-staged": "latest",
+    "live-server": "^1.2.0",
+    "lodash": "latest",
+    "npm-dts-webpack-plugin": "latest",
+    "prettier": "latest",
+    "rollup": "latest",
+    "rollup-plugin-filesize": "latest",
+    "sass": "latest",
+    "slugify": "latest",
+    "source-map-loader": "latest",
+    "stylelint": "latest",
+    "stylelint-config-standard": "latest",
+    "stylelint-config-standard-scss": "latest",
+    "stylelint-scss": "latest",
+    "ts-jest": "latest",
+    "ts-loader": "latest",
+    "tslib": "latest",
+    "typescript": "latest",
+    "webpack": "latest"
+  },
+  "peerDependencies": {
+    "react": "^16.9.0 || ^17 || ^18",
+    "react-dom": "^16.9.0 || ^17 || ^18"
+  },
+  "dependencies": {
+    "react": "^16.9.0 || ^17 || ^18",
+    "react-dom": "^16.9.0 || ^17 || ^18"
+  }
 }
