@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <meta name="viewport" content="width=device-width" />
+    <title>Multi Conn App</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script>
+    <script src="jquery-3.4.1.min.js"></script>
+    <!-- <script src="scripts/jquery.signalR-2.2.2.min.js"></script> -->
+    <!-- <script src="https://localhost:44338/signalr/hubs"></script> -->
+    <script src="dist/easy-meet.min.js"></script>
+    <!-- <script type="module">
+        import WebrtcBase from './dist/index.js';
+       
+    </script> -->
+    <script src="src/app.js"></script>
+
+
+
+    <script>
+        
+        $(function () {
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            var meeting_id = urlParams.get('mid');
+
+            // if (!meeting_id) {
+            //     var murl = window.location.origin + "?mid=" +  (new Date()).getTime();
+            //     $('#meetingid').attr('href',murl).text(murl);
+            //     $("#meetingContainer").hide();
+            //     $("#meetingbox").show();
+            //     return;
+            // }
+
+            // var user_id = urlParams.get('uid');
+            // if (!user_id) {
+            //     user_id = window.prompt('Enter your nick!');
+            // }
+
+            // if (!user_id || !meeting_id) {
+            //     alert('user id or meeting id missing');
+            //     return;
+            // }
+            $("#meetingContainer").show();
+            $("#meetingbox").hide();
+
+            // MyApp._init(user_id,meeting_id);
+
+        });
+    </script>
+</head>
+<body>
+
+    <div id="meetingbox" style="display: none;">
+        <p>It seems you are not trying to join any meeting!
+            You may start a new meeting. Here is generated for you.  <a id='meetingid' href="#"></a>
+        </p>
+    </div>
+
+    <div id="meetingContainer" style="display: none;">
+        <h1 id='meetingname'></h1>
+
+        <input type="file" id="fileinput" />
+        <button id="btnsendfile">Send File</button>
+        <input type="file" id="fileinput2" />
+        <button id="btnsendfile2">Send File</button>
+
+        <div id="fileprogress"></div>
+
+        <div>
+
+            <input type="text" id="msgbox" />
+            <button id="btnsend">Send</button>
+            
+            <div id='messages' ></div>
+           
+            <div id='divUsers' style="display:none">
+                <div id="me" class="userbox">
+                    <h2></h2>
+                    <div>
+                        <video autoplay muted id="localVideoCtr" ></video>
+                        <video autoplay muted id="localScreenVideoCtr" ></video>
+
+                    </div>
+                </div>
+                <div id="otherTemplate" class="userbox" style="display:none">
+                    <h2></h2>
+                    <div>
+                        <video autoplay muted id="remoteVideoCtr111 " class="video"></video>
+                        <video autoplay muted id="remoteVideoCtr111" class="screen"></video>
+
+                        <audio autoplay controls  id="remoteAudioCtr111" class="audio"></audio>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+        <div style="clear: both;"></div>
+        <div class="toolbox" style="display:none">
+            <button id="btnMuteUnmute">UnMute</button>
+            <button id="btnStartStopCam">Start Camera</button>
+            <button id="btnStartStopScreenshare">Screen Share</button>
+            <button id="btnResetMeeting">Reset Meeting</button>
+        </div>
+    </div>
+    <br>
+    <br>
+    
+
+
+</body>
+</html>

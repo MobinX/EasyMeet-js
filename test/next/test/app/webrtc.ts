@@ -14,7 +14,19 @@ interface PeerStateChangedHandler {
   ): void;
 }
 
-interface FileState {
+export interface peerState {
+  socketId: string;
+  info: any;
+  isAudioOn: boolean;
+  isVideoOn: boolean;
+  isScreenShareOn: boolean;
+  audioStream: MediaStream | null;
+  videoStream: MediaStream | null;
+  screenShareStream: MediaStream | null;
+  isPolite: boolean;
+}
+
+export interface FileState {
   fileId: string;
   totalSize: number;
   completedSize: number;
@@ -82,6 +94,14 @@ export  class WebrtcBase {
 
   private _onError: Function[] = [];
 
+
+  /**
+   * Creates a new WebrtcBase instance.
+   * 
+   * @param my_connid The unique identifier of the local peer.
+   * @param iceConfiguration The configuration for the ICE servers to be used.
+   * @param serverFn The function to be called when a WebRTC message needs to be sent.
+   */
   constructor(
     my_connid: string,
     iceConfiguration: RTCConfiguration,
@@ -92,8 +112,16 @@ export  class WebrtcBase {
     this._iceConfiguration = iceConfiguration;
   }
 
+  /**
+ * Creates a new connection.
+ * 
+ * @param {string} connid - The unique identifier of the local peer.
+ * @param {boolean} politePeerState - Indicates whether the peer is polite or not.
+ * @param {any | null} [extraInfo=null] - Extra information about the peer.
+ * @returns {void}
+ */
   // connections management
-  async createConnection(
+   createConnection(
     connid: string,
     politePeerState: boolean,
     extraInfo: any | null = null
@@ -334,6 +362,14 @@ export  class WebrtcBase {
     }
   }
 
+  /**
+   * Handle socket message.
+   * 
+   * @param message - socket message
+   * @param from_connid - connection id of the sender
+   * @param extraInfo - extra information
+   * @returns Promise<void>
+   */
   async onSocketMessage(
     message: any,
     from_connid: string,
@@ -429,6 +465,12 @@ export  class WebrtcBase {
     else return false;
   }
 
+  /**
+   * Close connection.
+   *
+   * @param {string} connid - The connection ID.
+   * @return {void} This function does not return anything.
+   */
   closeConnection(connid: string) {
     if (this._peerConnections[connid]) {
       this._peers_ids[connid] = null;
@@ -457,10 +499,36 @@ export  class WebrtcBase {
     this._updatePeerState();
   }
 
+  /**
+   * Registers a callback function to be called when the peer state changed.
+   *
+   * @param {PeerStateChangedHandler} fn - The callback function.
+   * @return {void} This function does not return anything.
+   * @example
+   * // Register a callback function
+   * onPeerStateChange((peerProperties) => {
+   *   // Handle peer state change
+   *   console.log(peerProperties);
+   * });
+   */
   onPeerStateChange(fn: PeerStateChangedHandler) {
     this._onPeerStateChanged.push(fn);
   }
 
+  /**
+   * Sends a message through the data channel.
+   *
+   * @param {string} conId - The connection ID of the peer to send the message to.
+   * If set to "all", the message will be sent to all connected peers.
+   * @param {any} msg - The message to send.
+   * @return {void} This function does not return anything.
+   * @example
+   * // Send a message to a specific peer
+   * sendDataChannelMsg("peer-id", { message: "Hello, peer!" });
+   *
+   * // Send a message to all connected peers
+   * sendDataChannelMsg("all", { message: "Hello, everyone!" });
+   */
   sendDataChannelMsg(conId: string, msg: any) {
     if (conId === "all") {
       for (let connid in this._peerConnections) {
@@ -471,14 +539,54 @@ export  class WebrtcBase {
     this._dataChannels[conId]?.send(JSON.stringify(msg));
   }
 
-  onDataChannelMsg(fn: Function) {
+
+  /**
+   * Registers a callback function to be called when a message is received
+   * through the data channel.
+   *
+   * @param {function} fn - The callback function.
+   * @return {void} This function does not return anything.
+   * @example
+   * // Register a callback function
+   * onDataChannelMsg((fromId, msg) => {
+   *   // Handle received message
+   *   console.log(fromId, msg);
+   * });
+   */
+  onDataChannelMsg(fn: (fromId:string, msg:string) => void) {
     this._onDataChannelMsgCallback.push(fn);
   }
 
+  /**
+   * Registers a callback function to be called when a file sending request is made.
+   * The function should return a boolean value indicating whether to allow or reject the request.
+   *
+   * @param {function} fn - The callback function.
+   * @return {void} This function does not return anything.
+   * @example
+   * // Register a callback function
+   * onFileSendingReq((fileName, peerId) => {
+   *   // Check if the file should be allowed to be sent
+   *   return shouldAllowFileSending(fileName, peerId);
+   * });
+   */
   onFileSendingReq(fn: (name: string, conId: string) => boolean) {
     this._fileSendingReqCallbacks = fn;
   }
 
+  /**
+   * Registers a callback function to be called when a file state changes.
+   * The function should accept a file state object and return void.
+   *
+   * @param {function} fn - The callback function.
+   * @return {void} This function does not return anything.
+   * @example
+   * // Register a callback function
+   * onFileStateChange((fileState) => {
+   *   // Handle file state changes
+   *   console.log(fileState);
+   * });
+   */
   onFileStateChange(fn: (fileState: FileState) => void) {
     this._onFileStateChanged.push(fn);
   }
@@ -486,6 +594,20 @@ export  class WebrtcBase {
     this._onFileStateChanged.forEach((fn) => fn(this._fileStates[fileID]));
   }
 
+  /**
+   * Registers a callback function to be called when a file transfer is completed.
+   * The function should accept a file state object and a url of the file object and return void.
+   *
+   * @param {function} fn - The callback function. (fileState , objectUrl)
+   * @return {void} This function does not return anything.
+   * @example
+   * // Register a callback function
+   * onFileTransferCompleted((fileState, objectUrl) => {
+   *   // Handle file transfer completed
+   *   console.log(fileState);
+   *   console.log(objectUrl);
+   * });
+   */
   onFileTransferCompleted(
     fn: (fileState: FileState, objectURl: string) => void
   ) {
@@ -496,6 +618,16 @@ export  class WebrtcBase {
     this._onFileTransferCompleted.forEach((fn) => fn(fileState, objectURl));
   }
 
+  /**
+   * Sends a file to the specified peer.
+   *
+   * @param {string} to - The ID of the peer to send the file to.
+   * @param {File} file - The file to send.
+   * @return {void} This function does not return anything.
+   * @example
+   * // Send a file
+   * sendFile("peerId", file);
+   */
   sendFile(to: string, file: File) {
     let fileId = crypto.randomUUID();
     this._fileStates[fileId] = {
@@ -686,7 +818,9 @@ export  class WebrtcBase {
     } else if (processedMsg.type == "file_sending_response") {
       this._sendFileUsingDataChannel(conId, processedMsg.data);
     }
+    else {
     this._onDataChannelMsgCallback.forEach((fn) => fn(conId, msg));
+    }
   }
 
   _updatePeerState() {
@@ -730,6 +864,32 @@ export  class WebrtcBase {
     this._onPeerStateChanged.forEach((fn) => fn(peerProperties));
   }
 
+  /**
+   * Returns an array of objects containing details about all the current
+   * peers in the WebRTC connection. Each object has the following properties:
+   *
+   * - `socketId`: The ID of the peer.
+   * - `info`: The information about the peer.
+   * - `isAudioOn`: Whether audio is currently enabled for the peer.
+   * - `isVideoOn`: Whether video is currently enabled for the peer.
+   * - `isScreenShareOn`: Whether screen sharing is currently enabled for the peer.
+   * - `audioStream`: The audio stream for the peer.
+   * - `videoStream`: The video stream for the peer.
+   * - `screenShareStream`: The screen sharing stream for the peer.
+   * - `isPolite`: Whether the peer is in a polite state.
+   *
+   * @return {Array<{
+   *   socketId: string;
+   *   info: any;
+   *   isAudioOn: boolean;
+   *   isVideoOn: boolean;
+   *   isScreenShareOn: boolean;
+   *   audioStream: MediaStream | null;
+   *   videoStream: MediaStream | null;
+   *   screenShareStream: MediaStream | null;
+   *   isPolite: boolean;
+   * }>} An array of objects containing details about all the current peers.
+   */
   getAllPeerDetails() {
     let peerProperties: {
       socketId: string;
@@ -1009,7 +1169,7 @@ export  class WebrtcBase {
   }
 
   // callback handlers
-  onError(fn: Function) {
+  onError(fn: (error: any) => void) {
     this._onError.push(fn);
   }
   _emitError(error: any) {

@@ -2,13 +2,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-
+import replace from '@rollup/plugin-replace';
 import babel from "@rollup/plugin-babel";
 import resolve from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import filesize from "rollup-plugin-filesize";
 import terser from "@rollup/plugin-terser";
 import typescript from "@rollup/plugin-typescript";
+import nodePolyfills from 'rollup-plugin-polyfill-node';
+
+
 
 const pkg = JSON.parse(
   fs
@@ -151,6 +154,56 @@ const config = [
       declarationDir: "dist",
     }),
     filesize(),
+    
+  ],
+  external: [
+    ...Object.keys(pkg.dependencies || {}),
+    ...Object.keys(pkg.peerDependencies || {}),
+
+  ],
+},
+{
+  input: 'src/app.tsx',
+  output: [
+    {
+      file: "src/app/index.js",
+      format: 'umd',
+      sourcemap: "true",
+      globals: {
+        react: 'React',            // Mapping 'react' module to the 'React' global variable
+        'react-dom': 'ReactDOM',   // Mapping 'react-dom' module to the 'ReactDOM' global variable
+        process: 'process',        // Mapping 'process' to 'process' global (for environment checks)
+      },
+    }
+  ], plugins: [
+    resolve({
+  
+      extensions: [".js", ".jsx", ".ts", ".tsx"],
+    }),
+    babel({
+      babelHelpers: 'bundled',
+      presets: [
+        "@babel/preset-typescript",
+        "@babel/preset-env",
+        ['@babel/preset-react', { "runtime": "automatic" }]
+      ],
+      plugins: [
+        "@babel/plugin-transform-react-jsx",
+        "@babel/plugin-proposal-class-properties",
+      ],
+      extensions: ['.js', '.jsx', ]
+    }),
+    commonjs(),
+    typescript({
+      tsconfig: "./tsconfig.build.json",
+      declaration: true,
+      declarationDir: "dist",
+    }),
+    filesize(),
+    replace({
+      preventAssignment: false,
+      'process.env.NODE_ENV': '"development"'
+   })
   ],
   external: [
     ...Object.keys(pkg.dependencies || {}),

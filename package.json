@@ -10,6 +10,9 @@
   "browser": "dist/easy-meet.min.js",
   "module": "dist/es/index.js",
   "unpkg": "dist/easy-meet.min.js",
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "import": "./dist/es/index.js",
@@ -47,9 +50,6 @@
     "WebRTC",
     "Real time video call",
     "react webrt"
-
-
-
   ],
   "repository": {
     "type": "git",
@@ -71,8 +71,9 @@
     "@babel/preset-typescript": "latest",
     "@react-docgen/cli": "latest",
     "@rollup/plugin-babel": "latest",
-    "@rollup/plugin-commonjs": "latest",
-    "@rollup/plugin-node-resolve": "latest",
+    "@rollup/plugin-commonjs": "^26.0.1",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-replace": "^5.0.7",
     "@rollup/plugin-terser": "latest",
     "@rollup/plugin-typescript": "latest",
     "@testing-library/react": "latest",
@@ -80,6 +81,7 @@
     "@types/jest": "latest",
     "@types/node": "latest",
     "@types/react": "^18.3.4",
+    "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "latest",
     "@typescript-eslint/parser": "latest",
     "axe-core": "latest",
@@ -108,6 +110,7 @@
     "prettier": "latest",
     "rollup": "latest",
     "rollup-plugin-filesize": "latest",
+    "rollup-plugin-polyfill-node": "^0.13.0",
     "sass": "latest",
     "slugify": "latest",
     "source-map-loader": "latest",
@@ -126,6 +129,7 @@
     "react-dom": "^16.9.0 || ^17 || ^18"
   },
   "dependencies": {
+    "process": "^0.11.10",
     "react": "^16.9.0 || ^17 || ^18",
     "react-dom": "^16.9.0 || ^17 || ^18"
   }
