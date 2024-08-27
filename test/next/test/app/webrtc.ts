@@ -931,6 +931,24 @@ export  class WebrtcBase {
     return peerProperties;
   }
 
+
+  /**
+   * Returns an object containing details about a specific peer in the WebRTC 
+   * connection. The object has the following properties:
+   *
+   * - `socketId`: The ID of the peer.
+   * - `info`: The information about the peer.
+   * - `isAudioOn`: Whether audio is currently enabled for the peer.
+   * - `isVideoOn`: Whether video is currently enabled for the peer.
+   * - `isScreenShareOn`: Whether screen sharing is currently enabled for the peer.
+   * - `audioStream`: The audio stream for the peer.
+   * - `videoStream`: The video stream for the peer.
+   * - `screenShareStream`: The screen sharing stream for the peer.
+   * - `isPolite`: Whether the peer is in a polite state.
+   *
+   * @param {string} connid - The ID of the peer to get details for.
+   * @return {Object|null} An object containing details about the peer, or null if the peer does not exist.
+   */
   getPeerDetailsById(connid: string) {
     if (this._peerConnections[connid]) {
       return {
@@ -1004,6 +1022,13 @@ export  class WebrtcBase {
     }
   }
 
+  /**
+   * Starts the camera and enables video transmission.
+   * If the camera is already started, it stops the current camera and starts a new one.
+   * @param cameraConfig The configuration for the camera. Defaults to a 640x480 video stream with no audio.
+   * @returns A Promise that resolves when the camera is started.
+   * @throws {Error} If the camera cannot be started.
+   */
   async startCamera(
     cameraConfig = {
       video: {
@@ -1034,6 +1059,12 @@ export  class WebrtcBase {
     );
   }
 
+  /**
+   * Register a callback function to be called whenever the camera video state changes.
+   * The callback function takes in two parameters: `state` (a boolean indicating whether the camera video is on or off) and `stream` (the current video stream from the camera).
+   * The callback function will be pushed to the end of the list of callback functions.
+   * @param fn The callback function to be registered. (state: boolean, stream: MediaStream | null) => void
+   */
   onCameraVideoStateChange(
     fn: (state: boolean, stream: MediaStream | null) => void
   ) {
@@ -1049,6 +1080,12 @@ export  class WebrtcBase {
     );
   }
 
+  /**
+   * Register a callback function to be called whenever the screen share video state changes.
+   * The callback function takes in two parameters: `state` (a boolean indicating whether the screen share video is on or off) and `stream` (the current video stream from the screen share).
+   * The callback function will be pushed to the end of the list of callback functions.
+   * @param fn The callback function to be registered. (state: boolean, stream: MediaStream | null) => void
+   */
   onScreenShareVideoStateChange(
     fn: (state: boolean, stream: MediaStream | null) => void
   ) {
@@ -1061,21 +1098,47 @@ export  class WebrtcBase {
     );
   }
 
+
+  /**
+   * Register a callback function to be called whenever the audio state changes.
+   * The callback function takes in two parameters: `state` (a boolean indicating whether the audio is on or off) and `stream` (the current audio stream).
+   * The callback function will be pushed to the end of the list of callback functions.
+   * 
+   * @param fn The callback function to be registered. (state: boolean, stream: MediaStream | null) => void
+   */
   onAudioStateChange(fn: (state: boolean, stream: MediaStream | null) => void) {
     this._onAudioStateChanged.push(fn);
   }
 
+  /**
+   * Stops the camera and disables video transmission.
+   * This function clears the camera video streams and emits the camera video state as false.
+   * It also sets the video muted state to true.
+   */
   stopCamera() {
     this._ClearCameraVideoStreams(this._rtpVideoSenders);
     this._emitCameraVideoState(false);
     this._isVideoMuted = true;
   }
 
+  /**
+   * Toggles the camera on or off.
+   * If the camera is currently off, it starts the camera.
+   * If the camera is currently on, it stops the camera.
+   * @returns {Promise<void>} A Promise that resolves when the camera is started or stopped.
+   */
   async toggleCamera() {
     if (this._isVideoMuted) await this.startCamera();
     else this.stopCamera();
   }
 
+  /**
+   * Starts the screen share and enables screen sharing.
+   * If the screen share is already started, it stops the current screen share and starts a new one.
+   * @param screenConfig The configuration for the screen share. Defaults to a 640x480 video stream with no audio.
+   * @returns A Promise that resolves when the screen share is started.
+   * @throws {Error} If the screen share cannot be started.
+   */
   async startScreenShare(
     screenConfig = {
       video: {
@@ -1110,17 +1173,35 @@ export  class WebrtcBase {
     }
   }
 
+  /**
+   * Stops the screen share and disables screen sharing.
+   * If there is no screen share currently, this function does nothing.
+   * @returns {Promise<void>} A Promise that resolves when the screen share is stopped.
+   */
   stopScreenShare() {
     this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
     this._emitScreenShareState(false);
     this._isScreenShareMuted = true;
   }
 
+
+  /**
+   * Toggles the screen share state.
+   * If screen sharing is currently stopped, it starts screen sharing.
+   * If screen sharing is currently started, it stops screen sharing.
+   * @returns {Promise<void>} A Promise that resolves when the screen share state is toggled.
+   */
   async toggleScreenShare() {
     if (this._isScreenShareMuted) await this.startScreenShare();
     else this.stopScreenShare();
   }
 
+  /**
+   * Starts the audio and enables audio transmission.
+   * If the audio is already started, it does nothing.
+   * @returns {Promise<void>} A Promise that resolves when the audio is started.
+   * @throws {Error} If the audio cannot be started.
+   */
   async startAudio() {
     try {
       if (!this._audioTrack) {
@@ -1143,6 +1224,11 @@ export  class WebrtcBase {
     }
   }
 
+  /**
+   * Stops the audio and disables audio transmission.
+   * If the audio is already stopped, it does nothing.
+   * @returns {Promise<void>} A Promise that resolves when the audio is stopped.
+   */
   async stopAudio() {
     if (this._audioTrack) {
       this._audioTrack.enabled = false;
@@ -1151,24 +1237,53 @@ export  class WebrtcBase {
       this._emitAudioState(false);
     }
   }
+
+  /**
+   * Toggles the audio between started and stopped states.
+   * If the audio is started, it stops it. If the audio is stopped, it starts it.
+   * @returns {Promise<void>} A Promise that resolves when the audio is toggled.
+   */
   async toggleAudio() {
     if (this._isAudioMuted) await this.startAudio();
     else await this.stopAudio();
   }
 
+  /**
+   * Returns whether the local audio is on.
+   * If the local audio is muted, it returns false.
+   * Otherwise, it returns true.
+   * @returns {boolean} Whether the local audio is on.
+   */
   isLocalAudioOn() {
     return !this._isAudioMuted;
   }
 
+  /**
+   * Returns whether the local video is on.
+   * If the local video is muted, it returns false.
+   * Otherwise, it returns true.
+   * @returns {boolean} Whether the local video is on.
+   */
   isLocalVideoOn() {
     return !this._isVideoMuted;
   }
 
+
+  /**
+   * Returns whether the local screen share is on.
+   * If the local screen share is muted, it returns false.
+   * Otherwise, it returns true.
+   * @returns {boolean} Whether the local screen share is on.
+   */
   isLocalScreenShareOn() {
     return !this._isScreenShareMuted;
   }
-
-  // callback handlers
+  
+  /**
+   * Register a callback function to be called when an error occurs.
+   * The callback function takes an error object as a parameter.
+   * @param fn The callback function to be registered.
+   */
   onError(fn: (error: any) => void) {
     this._onError.push(fn);
   }
