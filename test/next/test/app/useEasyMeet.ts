@@ -32,11 +32,13 @@ export interface easyMeetInterface {
   audioStream: MediaStream | null;
   videoStream: MediaStream | null;
   screenShareStream: MediaStream | null;
-  dataChannelMsg: { from: string; msg: string } | null;
+  newDataChannelMsg: { from: string; msg: string } | null;
   fileSharingCompleted: { file: FileState; objectUrl: string } | null;
   fileSharingState: FileState | null;
   isSystemReady: boolean;
   peers: peerState[];
+  sendDataChannelMsg: (msg: string, toID: string) => void;
+  sendFile: (to: string, file: File) => void;
 }
 
 /**
@@ -70,7 +72,7 @@ export interface easyMeetInterface {
  * audioStream: MediaStream | null
  * videoStream: MediaStream | null
  * screenShareStream: MediaStream | null
- * dataChannelMsg: {from: string; msg: string} | null
+ * newDataChannelMsg: {from: string; msg: string} | null
  * fileSharingCompleted: {file:FileState , objectUrl: string} | null
  * fileSharingState: FileState | null
  * isSystemReady: boolean  
@@ -92,7 +94,7 @@ export const useEasyMeet = (
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
   const [screenShareStream, setScreenShareStream] =
     useState<MediaStream | null>(null);
-  const [dataChannelMsg, setDataChennelMsg] = useState<{
+  const [newDataChannelMsg, setDataChennelMsg] = useState<{
     from: string;
     msg: string;
   } | null>(null);
@@ -150,6 +152,7 @@ export const useEasyMeet = (
         setFileSharingState(fileState);
       });
       webRTCBaseRef.current.onFileTransferCompleted((fileState, objectURl) => {
+        console.log("HOOK :onFileTransferCompleted", fileState, objectURl);
         setFileSharingCompleted({ file: fileState, objectUrl: objectURl });
       });
 
@@ -302,6 +305,22 @@ export const useEasyMeet = (
     }
   }, [webRTCBaseRef]);
 
+  const sendDataChannelMsg = useCallback((msg:any,toID:string)=>{
+    if (webRTCBaseRef.current) {
+      webRTCBaseRef.current.sendDataChannelMsg(toID,msg);
+    } else {
+      setError({ type: "sys-error", message: "Webrtc System is not ready" });
+    }
+  }, [])
+
+  const sendFile = useCallback((to: string, file: File) => {
+    if (webRTCBaseRef.current) {
+      webRTCBaseRef.current.sendFile(to, file);
+    } else {
+      setError({ type: "sys-error", message: "Webrtc System is not ready" });
+    }
+  }, []);
+
   return {
     peers,
     webRTCBaseRef,
@@ -328,9 +347,11 @@ export const useEasyMeet = (
     audioStream,
     videoStream,
     screenShareStream,
-    dataChannelMsg,
+    newDataChannelMsg,
     fileSharingCompleted,
     fileSharingState,
     isSystemReady,
+    sendDataChannelMsg,
+    sendFile
   };
 };

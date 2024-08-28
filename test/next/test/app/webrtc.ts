@@ -193,6 +193,8 @@ export class WebrtcBase {
               lastTimeStamp: Date.now(),
             };
             this._emitFileStateChange(fileid);
+            console.log( this._fileStates[fileid].completedSize ==
+              this._fileStates[fileid].totalSize)
             if (
               this._fileStates[fileid].completedSize ==
               this._fileStates[fileid].totalSize
@@ -201,6 +203,7 @@ export class WebrtcBase {
                 this._fileStates[fileid].receivedArrayBuffer
               );
               let objectURL = URL.createObjectURL(contentArrayblob);
+              console.log(objectURL);
               this._emitFileTransferCompleted(
                 this._fileStates[fileid],
                 objectURL
@@ -572,6 +575,7 @@ export class WebrtcBase {
   }
 
   _emitFileTransferCompleted(fileState: FileState, objectURl: string) {
+    console.log("onFileTransferCompleted", fileState, objectURl);
     this._onFileTransferCompleted.forEach((fn) => fn(fileState, objectURl));
   }
 
@@ -783,7 +787,10 @@ export class WebrtcBase {
         );
       }
     }
-    this._onDataChannelMsgCallback.forEach((fn) => fn(conId, msg));
+    else {
+      this._onDataChannelMsgCallback.forEach((fn) => fn(conId, msg));
+
+    }
   }
 
   _updatePeerState() {

@@ -2,6 +2,7 @@
 import Ably from "ably";
 import { useEasyMeet } from "./useEasyMeet";
 import { useEffect, useRef, useState } from "react";
+import { FileState } from "./webrtc";
 
 const ably = new Ably.Realtime({ key: 'YSXfdw.ksCpsA:Bf6jKYu4LPPpMfiFkSMJrZ4q4ArLDkuBf7bJCPxKQUo', clientId: Math.random().toString(36).substring(7) })
 ably.connection.once('connected').then(() => {
@@ -75,11 +76,49 @@ const AUdeo = ({ stream }: { stream: MediaStream }) => {
 
 export default function Meet({ iceServers }: { iceServers: any }) {
     const isInit = useRef<boolean | null>(null);
-    const { isSystemReady, joinExistingPeer, joinNewPeer, leavePeer,onSocketMessage, dataChannelMsg, toggleAudio, toggleCamera, toggleScreenShare, isAudioOn, isVideoOn, isScreenShareOn, audioStream, videoStream, screenShareStream, peers } = useEasyMeet(ably.auth.clientId, iceServers, sendmsg);
+    const { isSystemReady, joinExistingPeer, joinNewPeer, leavePeer, sendFile, fileSharingCompleted,fileSharingState,onSocketMessage,sendDataChannelMsg, newDataChannelMsg, toggleAudio, toggleCamera, toggleScreenShare, isAudioOn, isVideoOn, isScreenShareOn, audioStream, videoStream, screenShareStream, peers } = useEasyMeet(ably.auth.clientId, iceServers, sendmsg);
     const [myMsg,setMyMsg] = useState<string>("")
+    const [allMsg,setAllMsg] = useState<{from:string,msg:string}[]>([])
+    const [fileProgress,setFileProgress] = useState<{id:string,progress:number,url?:string|null,fileState?:FileState}[]>([])
     useEffect(() => {
         console.log(peers)
     },[peers])
+    useEffect(() => {
+        if(fileSharingState){
+            setFileProgress(prev=>{
+                let tempArray = [];
+                prev.map(item=>{
+                    if(item.id != fileSharingState.fileId){
+                        tempArray.push(item)
+                    }
+                })
+                tempArray.push({id:fileSharingState.fileId,progress:fileSharingState.progress,fileState:fileSharingState})
+                return tempArray
+            })
+        }
+
+    },[fileSharingState])
+    useEffect(() => {
+        console.log(fileSharingCompleted)
+        if(fileSharingCompleted){
+            setFileProgress(prev=>{
+                let tempArray = [];
+                prev.map(item=>{
+                    if(item.id != fileSharingCompleted.file.fileId){
+                        tempArray.push(item)
+                    }
+                })
+                tempArray.push({id:fileSharingCompleted.file.fileId,progress:100,url:fileSharingCompleted.objectUrl,fileState:fileSharingCompleted.file})
+                return tempArray
+
+            })
+        }
+    },[fileSharingCompleted])
+    useEffect(() => {
+        if(newDataChannelMsg){
+            setAllMsg(prev=>prev.concat([newDataChannelMsg]))
+        }
+    },[newDataChannelMsg,])
     useEffect(() => {
         async function init() {
             if (!isInit.current) {
@@ -130,6 +169,19 @@ export default function Meet({ iceServers }: { iceServers: any }) {
     return <div className="flex flex-row space-x-3">
         my id: {ably.auth.clientId}
 
+        <input value={myMsg} onChange={(e) => setMyMsg(e.target.value)} className="bg-gray-200" />
+        <button onClick={() => {sendDataChannelMsg(myMsg, "all"); setAllMsg(prev=>prev.concat([{from:ably.auth.clientId,msg:myMsg}])) ;setMyMsg(""); }}>send</button>
+
+        <input type="file" onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+                peers.forEach((peer) => {
+                    sendFile(peer.socketId, file);
+                })
+            }
+        }} />
+
+
         <button className="mx-2" onClick={async () => await toggleAudio()}>{isAudioOn ? 'mute' : 'unmute'}</button>
         <button onClick={async () => await toggleCamera()}>{isVideoOn ? 'camera off' : 'camera on'}</button>
         <button onClick={async () => await toggleScreenShare()}>{isScreenShareOn ? 'stop screen share' : 'start screen share'}</button>
@@ -143,6 +195,27 @@ export default function Meet({ iceServers }: { iceServers: any }) {
         </div>
 
         <hr />
+            {allMsg.map((msg, key) => (
+                <div key={key}>
+                    {msg.from} : {msg.msg}
+                </div>
+            ))}
+        <hr />
+
+
+
+        <hr />
+        <div>
+           {
+               fileProgress.map((item,key)=>{
+                   return <div key={key}>
+                        id: {item.fileState?.fileName} 
+                        <progress max="100" value={item.progress}></progress>
+                        {item.url && <a href={item.url} download={item.fileState?.fileName}>download</a>}
+                   </div>
+               })
+           } 
+        </div>
         <div>
             {peers.map((peer, key) => (
                 <div key={key}>
