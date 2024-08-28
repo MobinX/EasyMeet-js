@@ -25,7 +25,6 @@ export interface peerState {
   screenShareStream: MediaStream | null;
   isPolite: boolean;
 }
-
 export interface FileState {
   fileId: string;
   totalSize: number;
@@ -38,7 +37,7 @@ export interface FileState {
   receivedArrayBuffer: any[];
 }
 
-export  class WebrtcBase {
+export class WebrtcBase {
   private _iceConfiguration: RTCConfiguration | null = null;
   // local tracks
   private _audioTrack: MediaStreamTrack | null = null;
@@ -94,14 +93,6 @@ export  class WebrtcBase {
 
   private _onError: Function[] = [];
 
-
-  /**
-   * Creates a new WebrtcBase instance.
-   * 
-   * @param my_connid The unique identifier of the local peer.
-   * @param iceConfiguration The configuration for the ICE servers to be used.
-   * @param serverFn The function to be called when a WebRTC message needs to be sent.
-   */
   constructor(
     my_connid: string,
     iceConfiguration: RTCConfiguration,
@@ -112,16 +103,8 @@ export  class WebrtcBase {
     this._iceConfiguration = iceConfiguration;
   }
 
-  /**
- * Creates a new connection.
- * 
- * @param {string} connid - The unique identifier of the local peer.
- * @param {boolean} politePeerState - Indicates whether the peer is polite or not.
- * @param {any | null} [extraInfo=null] - Extra information about the peer.
- * @returns {void}
- */
   // connections management
-   createConnection(
+  async createConnection(
     connid: string,
     politePeerState: boolean,
     extraInfo: any | null = null
@@ -280,7 +263,49 @@ export  class WebrtcBase {
         }
 
         if (event.track.kind == "video") {
-          if (this._remoteScreenShareTrackIds[connid] == event.track.id) {
+          if (
+            this._remoteScreenShareTrackIds[connid] &&
+            this._remoteScreenShareTrackIds[connid] == "CAMERA OFF"
+          ) {
+            console.log("CAMERA OFF ", connid);
+            this._remoteScreenShareStreams[connid]
+              .getVideoTracks()
+              .forEach((t) =>
+                this._remoteScreenShareStreams[connid]?.removeTrack(t)
+              );
+            this._remoteScreenShareStreams[connid].addTrack(event.track);
+          } else if (
+            this._remoteScreenShareTrackIds[connid] &&
+            this._remoteScreenShareTrackIds[connid]?.startsWith("CAMERA ON")
+          ) {
+            let cameraTrackId = this._remoteScreenShareTrackIds[connid].replace(
+              "CAMERA ON-",
+              ""
+            );
+            console.log("CAMERA ON ", connid, cameraTrackId);
+
+            if (cameraTrackId != event.track.id) {
+              console.log("CAMERA ON ", connid);
+              this._remoteScreenShareStreams[connid]
+                .getVideoTracks()
+                .forEach((t) =>
+                  this._remoteScreenShareStreams[connid]?.removeTrack(t)
+                );
+              this._remoteScreenShareStreams[connid].addTrack(event.track);
+            }
+          } else if (
+            this._remoteScreenShareTrackIds[connid] &&
+            this._remoteScreenShareTrackIds[connid] == event.track.id
+          ) {
+            let scrID = this._remoteScreenShareTrackIds[connid];
+            console.log(
+              "SCREEN SHARE ON ",
+              connid,
+              scrID,
+              event.track.id,
+              scrID == event.track.id
+            );
+
             this._remoteScreenShareStreams[connid]
               .getVideoTracks()
               .forEach((t) =>
@@ -288,12 +313,14 @@ export  class WebrtcBase {
               );
             this._remoteScreenShareStreams[connid].addTrack(event.track);
           } else {
+            console.log("Camera track", connid);
             this._remoteVideoStreams[connid]
               .getVideoTracks()
               .forEach((t) => this._remoteVideoStreams[connid]?.removeTrack(t));
             this._remoteVideoStreams[connid].addTrack(event.track);
             // this._remoteVideoStreams[connid].getTracks().forEach(t => console.log(t));
           }
+          console.log("update state: by video track");
           this._updatePeerState();
         }
         if (event.track.kind == "audio") {
@@ -302,13 +329,15 @@ export  class WebrtcBase {
             .forEach((t) => this._remoteAudioStreams[connid]?.removeTrack(t));
           this._remoteAudioStreams[connid].addTrack(event.track);
           // this._remoteAudioStreams[connid].getTracks().forEach(t => console.log(t));
-
+          console.log("update state: by audio track");
           this._updatePeerState();
         }
         event.track.onunmute = () => {
+          console.log("update state: onunmute", connid);
           this._updatePeerState();
         };
         event.track.onmute = () => {
+          console.log("update state: onmute", connid);
           this._updatePeerState();
         };
       };
@@ -324,15 +353,20 @@ export  class WebrtcBase {
         this._AlterAudioVideoSenders(this._videoTrack, this._rtpVideoSenders);
       }
       if (this._screenShareTrack) {
-        this._serverFn(
-          JSON.stringify({ screenShareTrackId: this._screenShareTrack.id }),
-          connid
+        // this._serverFn(
+        //   JSON.stringify({ screenShareTrackId: this._screenShareTrack.id }),
+        //   connid
+        // );
+        this._AlterAudioVideoSenders(
+          this._screenShareTrack,
+          this._rtpScreenShareSenders
         );
       }
       if (this._audioTrack) {
         this._AlterAudioVideoSenders(this._audioTrack, this._rtpAudioSenders);
       }
 
+      console.log("createPeerConnection: update state", connid);
       this._updatePeerState();
     }
   }
@@ -344,13 +378,18 @@ export  class WebrtcBase {
         this._offferMakingStatePeers[connid] = true;
         console.log(
           connid +
-          " creating offer: connenction.signalingState:" +
-          connection?.signalingState
+            " creating offer: connenction.signalingState:" +
+            connection?.signalingState
         );
         let offer = await connection?.createOffer();
         await connection?.setLocalDescription(offer);
         this._serverFn(
-          JSON.stringify({ offer: connection?.localDescription }),
+          JSON.stringify({
+            offer: connection?.localDescription,
+            screenid: this._screenShareTrack?.id
+              ? this._screenShareTrack?.id
+              : null,
+          }),
           connid
         );
       }
@@ -362,14 +401,6 @@ export  class WebrtcBase {
     }
   }
 
-  /**
-   * Handle socket message.
-   * 
-   * @param message - socket message
-   * @param from_connid - connection id of the sender
-   * @param extraInfo - extra information
-   * @returns Promise<void>
-   */
   async onSocketMessage(
     message: any,
     from_connid: string,
@@ -381,8 +412,8 @@ export  class WebrtcBase {
       if (!this._peerConnections[from_connid]) {
         console.log(
           "peer " +
-          from_connid +
-          " not found , creating connection for ice candidate"
+            from_connid +
+            " not found , creating connection for ice candidate"
         );
         await this.createConnection(from_connid, false, extraInfo);
       }
@@ -403,6 +434,8 @@ export  class WebrtcBase {
         await this.createConnection(from_connid, false, extraInfo);
       }
       try {
+        if (msg.screenid)
+          this._remoteScreenShareTrackIds[from_connid] = msg.screenid;
         if (this._peerConnections[from_connid]) {
           const offerCollision =
             this._offferMakingStatePeers[from_connid] ||
@@ -420,6 +453,9 @@ export  class WebrtcBase {
           this._serverFn(
             JSON.stringify({
               answer: this._peerConnections[from_connid].localDescription,
+              screenid: this._screenShareTrack?.id
+                ? this._screenShareTrack?.id
+                : null,
             }),
             from_connid
           );
@@ -431,6 +467,9 @@ export  class WebrtcBase {
     } else if (msg.answer) {
       try {
         if (this._peerConnections[from_connid]) {
+          if (msg.screenid)
+            this._remoteScreenShareTrackIds[from_connid] = msg.screenid;
+
           console.log(from_connid, " answer", msg.answer);
           await this._peerConnections[from_connid].setRemoteDescription(
             new RTCSessionDescription(msg.answer)
@@ -446,12 +485,13 @@ export  class WebrtcBase {
       this._serverFn(JSON.stringify({ startSendingScreen: true }), from_connid);
     } else if (msg.startSendingScreen) {
       console.log(from_connid, " startSendingScreen", msg.startSendingScreen);
-      if (this._screenShareTrack && !this._isScreenShareMuted) {
-        this._AlterAudioVideoSenders(
-          this._screenShareTrack,
-          this._rtpScreenShareSenders
-        );
-      }
+      // if (this._screenShareTrack && !this._isScreenShareMuted) {
+      //   this._AlterAudioVideoSenders(
+      //     this._screenShareTrack,
+      //     this._rtpScreenShareSenders
+      //   );
+      // }
+      if (this._isScreenShareMuted) await this._startScreenShare();
     }
   }
 
@@ -465,12 +505,6 @@ export  class WebrtcBase {
     else return false;
   }
 
-  /**
-   * Close connection.
-   *
-   * @param {string} connid - The connection ID.
-   * @return {void} This function does not return anything.
-   */
   closeConnection(connid: string) {
     if (this._peerConnections[connid]) {
       this._peers_ids[connid] = null;
@@ -496,39 +530,15 @@ export  class WebrtcBase {
       this._remoteScreenShareStreams[connid] = null;
     }
 
+    console.log("closed connection: updatePeerState", connid);
+
     this._updatePeerState();
   }
 
-  /**
-   * Registers a callback function to be called when the peer state changed.
-   *
-   * @param {PeerStateChangedHandler} fn - The callback function.
-   * @return {void} This function does not return anything.
-   * @example
-   * // Register a callback function
-   * onPeerStateChange((peerProperties) => {
-   *   // Handle peer state change
-   *   console.log(peerProperties);
-   * });
-   */
   onPeerStateChange(fn: PeerStateChangedHandler) {
     this._onPeerStateChanged.push(fn);
   }
 
-  /**
-   * Sends a message through the data channel.
-   *
-   * @param {string} conId - The connection ID of the peer to send the message to.
-   * If set to "all", the message will be sent to all connected peers.
-   * @param {any} msg - The message to send.
-   * @return {void} This function does not return anything.
-   * @example
-   * // Send a message to a specific peer
-   * sendDataChannelMsg("peer-id", { message: "Hello, peer!" });
-   *
-   * // Send a message to all connected peers
-   * sendDataChannelMsg("all", { message: "Hello, everyone!" });
-   */
   sendDataChannelMsg(conId: string, msg: any) {
     if (conId === "all") {
       for (let connid in this._peerConnections) {
@@ -539,54 +549,14 @@ export  class WebrtcBase {
     this._dataChannels[conId]?.send(JSON.stringify(msg));
   }
 
-
-  /**
-   * Registers a callback function to be called when a message is received
-   * through the data channel.
-   *
-   * @param {function} fn - The callback function.
-   * @return {void} This function does not return anything.
-   * @example
-   * // Register a callback function
-   * onDataChannelMsg((fromId, msg) => {
-   *   // Handle received message
-   *   console.log(fromId, msg);
-   * });
-   */
-  onDataChannelMsg(fn: (fromId:string, msg:string) => void) {
+  onDataChannelMsg(fn: Function) {
     this._onDataChannelMsgCallback.push(fn);
   }
 
-  /**
-   * Registers a callback function to be called when a file sending request is made.
-   * The function should return a boolean value indicating whether to allow or reject the request.
-   *
-   * @param {function} fn - The callback function.
-   * @return {void} This function does not return anything.
-   * @example
-   * // Register a callback function
-   * onFileSendingReq((fileName, peerId) => {
-   *   // Check if the file should be allowed to be sent
-   *   return shouldAllowFileSending(fileName, peerId);
-   * });
-   */
   onFileSendingReq(fn: (name: string, conId: string) => boolean) {
     this._fileSendingReqCallbacks = fn;
   }
 
-  /**
-   * Registers a callback function to be called when a file state changes.
-   * The function should accept a file state object and return void.
-   *
-   * @param {function} fn - The callback function.
-   * @return {void} This function does not return anything.
-   * @example
-   * // Register a callback function
-   * onFileStateChange((fileState) => {
-   *   // Handle file state changes
-   *   console.log(fileState);
-   * });
-   */
   onFileStateChange(fn: (fileState: FileState) => void) {
     this._onFileStateChanged.push(fn);
   }
@@ -594,20 +564,6 @@ export  class WebrtcBase {
     this._onFileStateChanged.forEach((fn) => fn(this._fileStates[fileID]));
   }
 
-  /**
-   * Registers a callback function to be called when a file transfer is completed.
-   * The function should accept a file state object and a url of the file object and return void.
-   *
-   * @param {function} fn - The callback function. (fileState , objectUrl)
-   * @return {void} This function does not return anything.
-   * @example
-   * // Register a callback function
-   * onFileTransferCompleted((fileState, objectUrl) => {
-   *   // Handle file transfer completed
-   *   console.log(fileState);
-   *   console.log(objectUrl);
-   * });
-   */
   onFileTransferCompleted(
     fn: (fileState: FileState, objectURl: string) => void
   ) {
@@ -618,16 +574,6 @@ export  class WebrtcBase {
     this._onFileTransferCompleted.forEach((fn) => fn(fileState, objectURl));
   }
 
-  /**
-   * Sends a file to the specified peer.
-   *
-   * @param {string} to - The ID of the peer to send the file to.
-   * @param {File} file - The file to send.
-   * @return {void} This function does not return anything.
-   * @example
-   * // Send a file
-   * sendFile("peerId", file);
-   */
   sendFile(to: string, file: File) {
     let fileId = crypto.randomUUID();
     this._fileStates[fileId] = {
@@ -671,7 +617,6 @@ export  class WebrtcBase {
             this._fileTransferingDataChennels[data.fileId]!.onmessage = (e) => {
               console.log(conId + "file data channel onmessage " + data.fileId);
               let msg = JSON.parse(e.data);
-
               // this._emitDataChannelMsgCallback(conId, msg);
             }; // though sender never get msg but sends msg
 
@@ -683,8 +628,8 @@ export  class WebrtcBase {
         } else {
           this._emitError(
             "Failed to transfer file " +
-            data.fileName +
-            " because peer is not connected"
+              data.fileName +
+              " because peer is not connected"
           );
           return;
         }
@@ -753,21 +698,18 @@ export  class WebrtcBase {
           console.log("readSlice ", size);
           console.log(
             "data channel bufferedAmount remaining",
-       
+
             this._fileTransferingDataChennels[data.fileId]!.bufferedAmount
           );
           if (
-            (
-            this._fileTransferingDataChennels[data.fileId]!.bufferedAmount) > 955350
-            
+            this._fileTransferingDataChennels[data.fileId]!.bufferedAmount >
+            955350
           ) {
             // wait until data channel queue is empty by recursively cheking bufferedAmount
             console.log(
               "data channel buffer not empty , waiting for empty bufferedAmount"
             );
             setTimeout(() => readSlice(size), 50);
-             
-           
 
             return;
           }
@@ -817,10 +759,30 @@ export  class WebrtcBase {
       }
     } else if (processedMsg.type == "file_sending_response") {
       this._sendFileUsingDataChannel(conId, processedMsg.data);
+    } else if (processedMsg.screenShareTrackId) {
+      console.log(
+        conId,
+        " screenShareTrackId",
+        processedMsg.screenShareTrackId
+      );
+      this._remoteScreenShareTrackIds[conId] = processedMsg.screenShareTrackId;
+      this._dataChannels[conId]?.send(
+        JSON.stringify({ startSendingScreen: true })
+      );
+    } else if (processedMsg.startSendingScreen) {
+      console.log(
+        conId,
+        " startSendingScreen",
+        processedMsg.startSendingScreen
+      );
+      if (this._screenShareTrack && !this._isScreenShareMuted) {
+        this._AlterAudioVideoSenders(
+          this._screenShareTrack,
+          this._rtpScreenShareSenders
+        );
+      }
     }
-    else {
     this._onDataChannelMsgCallback.forEach((fn) => fn(conId, msg));
-    }
   }
 
   _updatePeerState() {
@@ -851,8 +813,7 @@ export  class WebrtcBase {
           isScreenShareOn:
             this._remoteScreenShareStreams[connid] != null &&
             this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
-              ?.enabled &&
-            !this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted,
+              ?.enabled,
           audioStream: this._remoteAudioStreams[connid],
           videoStream: this._remoteVideoStreams[connid],
           screenShareStream: this._remoteScreenShareStreams[connid],
@@ -864,32 +825,6 @@ export  class WebrtcBase {
     this._onPeerStateChanged.forEach((fn) => fn(peerProperties));
   }
 
-  /**
-   * Returns an array of objects containing details about all the current
-   * peers in the WebRTC connection. Each object has the following properties:
-   *
-   * - `socketId`: The ID of the peer.
-   * - `info`: The information about the peer.
-   * - `isAudioOn`: Whether audio is currently enabled for the peer.
-   * - `isVideoOn`: Whether video is currently enabled for the peer.
-   * - `isScreenShareOn`: Whether screen sharing is currently enabled for the peer.
-   * - `audioStream`: The audio stream for the peer.
-   * - `videoStream`: The video stream for the peer.
-   * - `screenShareStream`: The screen sharing stream for the peer.
-   * - `isPolite`: Whether the peer is in a polite state.
-   *
-   * @return {Array<{
-   *   socketId: string;
-   *   info: any;
-   *   isAudioOn: boolean;
-   *   isVideoOn: boolean;
-   *   isScreenShareOn: boolean;
-   *   audioStream: MediaStream | null;
-   *   videoStream: MediaStream | null;
-   *   screenShareStream: MediaStream | null;
-   *   isPolite: boolean;
-   * }>} An array of objects containing details about all the current peers.
-   */
   getAllPeerDetails() {
     let peerProperties: {
       socketId: string;
@@ -931,24 +866,6 @@ export  class WebrtcBase {
     return peerProperties;
   }
 
-
-  /**
-   * Returns an object containing details about a specific peer in the WebRTC 
-   * connection. The object has the following properties:
-   *
-   * - `socketId`: The ID of the peer.
-   * - `info`: The information about the peer.
-   * - `isAudioOn`: Whether audio is currently enabled for the peer.
-   * - `isVideoOn`: Whether video is currently enabled for the peer.
-   * - `isScreenShareOn`: Whether screen sharing is currently enabled for the peer.
-   * - `audioStream`: The audio stream for the peer.
-   * - `videoStream`: The video stream for the peer.
-   * - `screenShareStream`: The screen sharing stream for the peer.
-   * - `isPolite`: Whether the peer is in a polite state.
-   *
-   * @param {string} connid - The ID of the peer to get details for.
-   * @return {Object|null} An object containing details about the peer, or null if the peer does not exist.
-   */
   getPeerDetailsById(connid: string) {
     if (this._peerConnections[connid]) {
       return {
@@ -962,11 +879,7 @@ export  class WebrtcBase {
           this._remoteVideoStreams[connid] != null &&
           this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.enabled &&
           !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
-        isScreenShareOn:
-          this._remoteScreenShareStreams[connid] != null &&
-          this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
-            ?.enabled &&
-          !this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted,
+        isScreenShareOn: this._remoteScreenShareStreams[connid] != null,
         audioStream: this._remoteAudioStreams[connid],
         videoStream: this._remoteVideoStreams[connid],
         screenShareStream: this._remoteScreenShareStreams[connid],
@@ -1022,13 +935,6 @@ export  class WebrtcBase {
     }
   }
 
-  /**
-   * Starts the camera and enables video transmission.
-   * If the camera is already started, it stops the current camera and starts a new one.
-   * @param cameraConfig The configuration for the camera. Defaults to a 640x480 video stream with no audio.
-   * @returns A Promise that resolves when the camera is started.
-   * @throws {Error} If the camera cannot be started.
-   */
   async startCamera(
     cameraConfig = {
       video: {
@@ -1059,12 +965,6 @@ export  class WebrtcBase {
     );
   }
 
-  /**
-   * Register a callback function to be called whenever the camera video state changes.
-   * The callback function takes in two parameters: `state` (a boolean indicating whether the camera video is on or off) and `stream` (the current video stream from the camera).
-   * The callback function will be pushed to the end of the list of callback functions.
-   * @param fn The callback function to be registered. (state: boolean, stream: MediaStream | null) => void
-   */
   onCameraVideoStateChange(
     fn: (state: boolean, stream: MediaStream | null) => void
   ) {
@@ -1080,12 +980,6 @@ export  class WebrtcBase {
     );
   }
 
-  /**
-   * Register a callback function to be called whenever the screen share video state changes.
-   * The callback function takes in two parameters: `state` (a boolean indicating whether the screen share video is on or off) and `stream` (the current video stream from the screen share).
-   * The callback function will be pushed to the end of the list of callback functions.
-   * @param fn The callback function to be registered. (state: boolean, stream: MediaStream | null) => void
-   */
   onScreenShareVideoStateChange(
     fn: (state: boolean, stream: MediaStream | null) => void
   ) {
@@ -1098,110 +992,92 @@ export  class WebrtcBase {
     );
   }
 
-
-  /**
-   * Register a callback function to be called whenever the audio state changes.
-   * The callback function takes in two parameters: `state` (a boolean indicating whether the audio is on or off) and `stream` (the current audio stream).
-   * The callback function will be pushed to the end of the list of callback functions.
-   * 
-   * @param fn The callback function to be registered. (state: boolean, stream: MediaStream | null) => void
-   */
   onAudioStateChange(fn: (state: boolean, stream: MediaStream | null) => void) {
     this._onAudioStateChanged.push(fn);
   }
 
-  /**
-   * Stops the camera and disables video transmission.
-   * This function clears the camera video streams and emits the camera video state as false.
-   * It also sets the video muted state to true.
-   */
   stopCamera() {
     this._ClearCameraVideoStreams(this._rtpVideoSenders);
     this._emitCameraVideoState(false);
     this._isVideoMuted = true;
   }
 
-  /**
-   * Toggles the camera on or off.
-   * If the camera is currently off, it starts the camera.
-   * If the camera is currently on, it stops the camera.
-   * @returns {Promise<void>} A Promise that resolves when the camera is started or stopped.
-   */
   async toggleCamera() {
     if (this._isVideoMuted) await this.startCamera();
     else this.stopCamera();
   }
 
-  /**
-   * Starts the screen share and enables screen sharing.
-   * If the screen share is already started, it stops the current screen share and starts a new one.
-   * @param screenConfig The configuration for the screen share. Defaults to a 640x480 video stream with no audio.
-   * @returns A Promise that resolves when the screen share is started.
-   * @throws {Error} If the screen share cannot be started.
-   */
+  async _startScreenShare() {
+    let screenStream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false,
+    });
+    this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
+    if (screenStream && screenStream.getVideoTracks().length > 0) {
+      this._isScreenShareMuted = false;
+      console.log("start screen share");
+      this._screenShareTrack = screenStream.getVideoTracks()[0];
+      this._emitScreenShareState(true);
+      this._AlterAudioVideoSenders(
+        this._screenShareTrack,
+        this._rtpScreenShareSenders
+      );
+    }
+  }
+
   async startScreenShare(
     screenConfig = {
-      video: {
-        width: 640,
-        height: 480,
-      },
+      video: true,
       audio: false,
     }
   ) {
     try {
-      let screenStream = await navigator.mediaDevices.getDisplayMedia(
-        screenConfig
-      );
+      // let screenStream = await navigator.mediaDevices.getDisplayMedia(
+      //   screenConfig
+      // );
       // screenStream.oninactive = (e: any) => {
       //     this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
       //     this._emitScreenShareState(false);
       // }
-      this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
-      if (screenStream && screenStream.getVideoTracks().length > 0) {
-        this._screenShareTrack = screenStream.getVideoTracks()[0];
-        this._emitScreenShareState(true);
-        for (let connid in this._peerConnections)
-          this._serverFn(
-            JSON.stringify({ screenShareTrackId: this._screenShareTrack.id }),
-            connid
-          );
+      // this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
+      // if (screenStream && screenStream.getVideoTracks().length > 0) {
+      //   this._screenShareTrack = screenStream.getVideoTracks()[0];
+      //   this._emitScreenShareState(true);
+      if (Object.keys(this._peerConnections).length == 0) {
+        console.log("no peers to share screen with");
+        await this._startScreenShare();
+        return;
       }
-      this._isScreenShareMuted = false;
+
+      await this._startScreenShare();
+      // for (let connid in this._peerConnections)
+      //   this._serverFn(
+      //     JSON.stringify({
+      //       screenShareTrackId: this._isVideoMuted
+      //         ? "CAMERA OFF"
+      //         : "CAMERA ON-" + this._videoTrack?.id,
+      //     }),
+      //     connid
+      //   );
+      // }
+      // this._isScreenShareMuted = false;
     } catch (e) {
       console.log(e);
       this._emitError("Failed to start screen share");
     }
   }
 
-  /**
-   * Stops the screen share and disables screen sharing.
-   * If there is no screen share currently, this function does nothing.
-   * @returns {Promise<void>} A Promise that resolves when the screen share is stopped.
-   */
   stopScreenShare() {
     this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
     this._emitScreenShareState(false);
     this._isScreenShareMuted = true;
   }
 
-
-  /**
-   * Toggles the screen share state.
-   * If screen sharing is currently stopped, it starts screen sharing.
-   * If screen sharing is currently started, it stops screen sharing.
-   * @returns {Promise<void>} A Promise that resolves when the screen share state is toggled.
-   */
   async toggleScreenShare() {
     if (this._isScreenShareMuted) await this.startScreenShare();
     else this.stopScreenShare();
   }
 
-  /**
-   * Starts the audio and enables audio transmission.
-   * If the audio is already started, it does nothing.
-   * @returns {Promise<void>} A Promise that resolves when the audio is started.
-   * @throws {Error} If the audio cannot be started.
-   */
   async startAudio() {
     try {
       if (!this._audioTrack) {
@@ -1224,11 +1100,6 @@ export  class WebrtcBase {
     }
   }
 
-  /**
-   * Stops the audio and disables audio transmission.
-   * If the audio is already stopped, it does nothing.
-   * @returns {Promise<void>} A Promise that resolves when the audio is stopped.
-   */
   async stopAudio() {
     if (this._audioTrack) {
       this._audioTrack.enabled = false;
@@ -1237,59 +1108,28 @@ export  class WebrtcBase {
       this._emitAudioState(false);
     }
   }
-
-  /**
-   * Toggles the audio between started and stopped states.
-   * If the audio is started, it stops it. If the audio is stopped, it starts it.
-   * @returns {Promise<void>} A Promise that resolves when the audio is toggled.
-   */
   async toggleAudio() {
     if (this._isAudioMuted) await this.startAudio();
     else await this.stopAudio();
   }
 
-  /**
-   * Returns whether the local audio is on.
-   * If the local audio is muted, it returns false.
-   * Otherwise, it returns true.
-   * @returns {boolean} Whether the local audio is on.
-   */
   isLocalAudioOn() {
     return !this._isAudioMuted;
   }
 
-  /**
-   * Returns whether the local video is on.
-   * If the local video is muted, it returns false.
-   * Otherwise, it returns true.
-   * @returns {boolean} Whether the local video is on.
-   */
   isLocalVideoOn() {
     return !this._isVideoMuted;
   }
 
-
-  /**
-   * Returns whether the local screen share is on.
-   * If the local screen share is muted, it returns false.
-   * Otherwise, it returns true.
-   * @returns {boolean} Whether the local screen share is on.
-   */
   isLocalScreenShareOn() {
     return !this._isScreenShareMuted;
   }
-  
-  /**
-   * Register a callback function to be called when an error occurs.
-   * The callback function takes an error object as a parameter.
-   * @param fn The callback function to be registered.
-   */
-  onError(fn: (error: any) => void) {
+
+  // callback handlers
+  onError(fn: Function) {
     this._onError.push(fn);
   }
   _emitError(error: any) {
     this._onError.forEach((fn) => fn(error));
   }
 }
-
-

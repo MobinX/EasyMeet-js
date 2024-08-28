@@ -10,16 +10,16 @@ import { FileState, peerState, WebrtcBase } from "./webrtc";
 export interface easyMeetInterface {
   webRTCBaseRef: MutableRefObject<WebrtcBase | null>;
   error: { type: "sys-error" | "webrtc-error"; message: string } | null;
-  onSocketMessage: Function;
-  startCamera: Function;
+  onSocketMessage: (message: string, from_connid: string, extraInfo: any | null) => Promise<void>;
+  startCamera: (cameraConfig?: { video: { width: number; height: number; }; audio: boolean; }) => Promise<void>;
   stopCamera: Function;
-  startScreenShare: Function;
+  startScreenShare: (screenConfig?: { video: { width: number; height: number; }; audio: boolean; }) => Promise<void>;
   stopScreenShare: Function;
-  toggleCamera: Function;
-  toggleScreenShare: Function;
+  toggleCamera: () => Promise<void>;
+  toggleScreenShare: () => Promise<void>;
   startAudio: Function;
   stopAudio: Function;
-  toggleAudio: Function;
+  toggleAudio: () => Promise<void>;
   isLocalAudioOn: () => boolean | undefined;
   isLocalVideoOn: () => boolean | undefined;
   isLocalScreenShareOn: () => boolean | undefined;
@@ -36,6 +36,7 @@ export interface easyMeetInterface {
   fileSharingCompleted: { file: FileState; objectUrl: string } | null;
   fileSharingState: FileState | null;
   isSystemReady: boolean;
+  peers: peerState[];
 }
 
 /**
@@ -75,7 +76,7 @@ export interface easyMeetInterface {
  * isSystemReady: boolean  
  * }
  */
-export const useEasyMethods = (
+export const useEasyMeet = (
   selfID: string,
   iceServers: any[],
   socketMsgFn: Function,
@@ -115,7 +116,7 @@ export const useEasyMethods = (
         { iceServers: iceServers },
         socketMsgFn
       );
-      webRTCBaseRef.current.onError((err) => {
+      webRTCBaseRef.current.onError((err:any) => {
         setError({ type: "webrtc-error", message: err });
       });
       webRTCBaseRef.current.onPeerStateChange((peersState: peerState[]) => {
@@ -139,7 +140,7 @@ export const useEasyMethods = (
           setScreenShareStream(stream);
         }
       );
-      webRTCBaseRef.current.onDataChannelMsg((fromId, msg) => {
+      webRTCBaseRef.current.onDataChannelMsg((fromId:any, msg:any) => {
         setDataChennelMsg({ from: fromId, msg: msg });
       });
       webRTCBaseRef.current.onFileSendingReq((name, conId) => {
@@ -190,9 +191,9 @@ export const useEasyMethods = (
   );
 
   const onSocketMessage = useCallback(
-    (message: string, from_connid: string, extraInfo: any = null) => {
+    async (message: string, from_connid: string, extraInfo: any = null) => {
       if (webRTCBaseRef.current) {
-        webRTCBaseRef.current.onSocketMessage(message, from_connid, extraInfo);
+        await webRTCBaseRef.current.onSocketMessage(message, from_connid, extraInfo);
       } else {
         setError({ type: "sys-error", message: "Webrtc System is not ready" });
       }
@@ -302,6 +303,7 @@ export const useEasyMethods = (
   }, [webRTCBaseRef]);
 
   return {
+    peers,
     webRTCBaseRef,
     error,
     onSocketMessage,
