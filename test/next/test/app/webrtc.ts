@@ -263,37 +263,38 @@ export class WebrtcBase {
         }
 
         if (event.track.kind == "video") {
-          if (
-            this._remoteScreenShareTrackIds[connid] &&
-            this._remoteScreenShareTrackIds[connid] == "CAMERA OFF"
-          ) {
-            console.log("CAMERA OFF ", connid);
-            this._remoteScreenShareStreams[connid]
-              .getVideoTracks()
-              .forEach((t) =>
-                this._remoteScreenShareStreams[connid]?.removeTrack(t)
-              );
-            this._remoteScreenShareStreams[connid].addTrack(event.track);
-          } else if (
-            this._remoteScreenShareTrackIds[connid] &&
-            this._remoteScreenShareTrackIds[connid]?.startsWith("CAMERA ON")
-          ) {
-            let cameraTrackId = this._remoteScreenShareTrackIds[connid].replace(
-              "CAMERA ON-",
-              ""
-            );
-            console.log("CAMERA ON ", connid, cameraTrackId);
+          // if (
+          //   this._remoteScreenShareTrackIds[connid] &&
+          //   this._remoteScreenShareTrackIds[connid] == "CAMERA OFF"
+          // ) {
+          //   console.log("CAMERA OFF ", connid);
+          //   this._remoteScreenShareStreams[connid]
+          //     .getVideoTracks()
+          //     .forEach((t) =>
+          //       this._remoteScreenShareStreams[connid]?.removeTrack(t)
+          //     );
+          //   this._remoteScreenShareStreams[connid].addTrack(event.track);
+          // } else if (
+          //   this._remoteScreenShareTrackIds[connid] &&
+          //   this._remoteScreenShareTrackIds[connid]?.startsWith("CAMERA ON")
+          // ) {
+          //   let cameraTrackId = this._remoteScreenShareTrackIds[connid].replace(
+          //     "CAMERA ON-",
+          //     ""
+          //   );
+          //   console.log("CAMERA ON ", connid, cameraTrackId);
 
-            if (cameraTrackId != event.track.id) {
-              console.log("CAMERA ON ", connid);
-              this._remoteScreenShareStreams[connid]
-                .getVideoTracks()
-                .forEach((t) =>
-                  this._remoteScreenShareStreams[connid]?.removeTrack(t)
-                );
-              this._remoteScreenShareStreams[connid].addTrack(event.track);
-            }
-          } else if (
+          //   if (cameraTrackId != event.track.id) {
+          //     console.log("CAMERA ON ", connid);
+          //     this._remoteScreenShareStreams[connid]
+          //       .getVideoTracks()
+          //       .forEach((t) =>
+          //         this._remoteScreenShareStreams[connid]?.removeTrack(t)
+          //       );
+          //     this._remoteScreenShareStreams[connid].addTrack(event.track);
+          //   }
+          // } else
+           if (
             this._remoteScreenShareTrackIds[connid] &&
             this._remoteScreenShareTrackIds[connid] == event.track.id
           ) {
@@ -812,8 +813,7 @@ export class WebrtcBase {
             !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
           isScreenShareOn:
             this._remoteScreenShareStreams[connid] != null &&
-            this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
-              ?.enabled,
+            this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.enabled  &&  !(this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted),
           audioStream: this._remoteAudioStreams[connid],
           videoStream: this._remoteVideoStreams[connid],
           screenShareStream: this._remoteScreenShareStreams[connid],
@@ -879,7 +879,9 @@ export class WebrtcBase {
           this._remoteVideoStreams[connid] != null &&
           this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.enabled &&
           !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
-        isScreenShareOn: this._remoteScreenShareStreams[connid] != null,
+        isScreenShareOn: this._remoteScreenShareStreams[connid] != null &&
+        this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.enabled &&
+        !(this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted),
         audioStream: this._remoteAudioStreams[connid],
         videoStream: this._remoteVideoStreams[connid],
         screenShareStream: this._remoteScreenShareStreams[connid],
@@ -1031,7 +1033,7 @@ export class WebrtcBase {
       audio: false,
     }
   ) {
-    try {
+  
       // let screenStream = await navigator.mediaDevices.getDisplayMedia(
       //   screenConfig
       // );
@@ -1043,13 +1045,24 @@ export class WebrtcBase {
       // if (screenStream && screenStream.getVideoTracks().length > 0) {
       //   this._screenShareTrack = screenStream.getVideoTracks()[0];
       //   this._emitScreenShareState(true);
-      if (Object.keys(this._peerConnections).length == 0) {
-        console.log("no peers to share screen with");
-        await this._startScreenShare();
-        return;
+     
+
+      try {
+        let videoStream = await navigator.mediaDevices.getDisplayMedia(screenConfig);
+        this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
+        if (videoStream && videoStream.getVideoTracks().length > 0) {
+          this._screenShareTrack = videoStream.getVideoTracks()[0];
+          this._emitScreenShareState(true);
+          this._AlterAudioVideoSenders(this._screenShareTrack, this._rtpScreenShareSenders);
+        }
+        this._isScreenShareMuted = false;
+      } catch (e) {
+        console.log(e);
+        this._emitError("Failed to start screen share");
       }
 
-      await this._startScreenShare();
+
+
       // for (let connid in this._peerConnections)
       //   this._serverFn(
       //     JSON.stringify({
@@ -1061,10 +1074,6 @@ export class WebrtcBase {
       //   );
       // }
       // this._isScreenShareMuted = false;
-    } catch (e) {
-      console.log(e);
-      this._emitError("Failed to start screen share");
-    }
   }
 
   stopScreenShare() {

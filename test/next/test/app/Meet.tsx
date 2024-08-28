@@ -1,7 +1,7 @@
 "use client"
 import Ably from "ably";
 import { useEasyMeet } from "./useEasyMeet";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const ably = new Ably.Realtime({ key: 'YSXfdw.ksCpsA:Bf6jKYu4LPPpMfiFkSMJrZ4q4ArLDkuBf7bJCPxKQUo', clientId: Math.random().toString(36).substring(7) })
 ably.connection.once('connected').then(() => {
@@ -17,9 +17,66 @@ async function sendmsg(msg: any, to: any) {
     console.log('message sent: ', msg);
 }
 
+const VIdeo = ({ stream }: { stream: MediaStream }) => {
+    let viref = useRef<HTMLVideoElement|null>(null)
+    let [isPlay, setIsPlay] = useState(false)
+    useEffect(() => {
+        if (viref.current) {
+            viref.current.srcObject = stream
+            viref.current?.play()
+            viref.current.onplaying = () => {
+                console.log("playing")
+                setIsPlay(true)
+            }
+            viref.current.onpause = () => {
+                console.log("pause")
+                setIsPlay(false)
+                viref.current?.play()
+            }
+
+            if(viref.current.paused){
+                viref.current.play()
+            }
+        }
+    })
+
+    return (
+        <video ref={viref} playsInline autoPlay muted style={{ width: "100%" }} controls={true}></video>
+    )
+}
+
+const AUdeo = ({ stream }: { stream: MediaStream }) => {
+    let viref = useRef<HTMLAudioElement|null>(null)
+    let [isPlay, setIsPlay] = useState(false)
+    useEffect(() => {
+        if (viref.current) {
+            viref.current.srcObject = stream
+            viref.current?.play()
+            viref.current.onplaying = () => {
+                console.log("playing")
+                setIsPlay(true)
+            }
+            viref.current.onpause = () => {
+                console.log("pause")
+                setIsPlay(false)
+                viref.current?.play()
+            }
+
+            if(viref.current.paused){
+                viref.current.play()
+            }
+        }
+    })
+
+    return (
+        <audio ref={viref} playsInline autoPlay  style={{ width: "100%" }} controls={true}></audio>
+    )
+}
+
 export default function Meet({ iceServers }: { iceServers: any }) {
     const isInit = useRef<boolean | null>(null);
-    const { isSystemReady, joinExistingPeer, joinNewPeer, leavePeer,onSocketMessage, toggleAudio, toggleCamera, toggleScreenShare, isAudioOn, isVideoOn, isScreenShareOn, audioStream, videoStream, screenShareStream, peers } = useEasyMeet(ably.auth.clientId, iceServers, sendmsg);
+    const { isSystemReady, joinExistingPeer, joinNewPeer, leavePeer,onSocketMessage, dataChannelMsg, toggleAudio, toggleCamera, toggleScreenShare, isAudioOn, isVideoOn, isScreenShareOn, audioStream, videoStream, screenShareStream, peers } = useEasyMeet(ably.auth.clientId, iceServers, sendmsg);
+    const [myMsg,setMyMsg] = useState<string>("")
     useEffect(() => {
         console.log(peers)
     },[peers])
@@ -77,51 +134,23 @@ export default function Meet({ iceServers }: { iceServers: any }) {
         <button onClick={async () => await toggleCamera()}>{isVideoOn ? 'camera off' : 'camera on'}</button>
         <button onClick={async () => await toggleScreenShare()}>{isScreenShareOn ? 'stop screen share' : 'start screen share'}</button>
         <div>
-            {isVideoOn && <video ref={(re) => {
-                if (re) {
-                    re.srcObject = videoStream;
-                    re.play()
-                }
-            }} autoPlay playsInline muted controls={true} ></video>}
+            {isVideoOn && <VIdeo stream={videoStream!} />}
             {
-                isScreenShareOn && <video ref={(re) => {
-                    if (re) {
-                        re.srcObject = screenShareStream;
-                        re.play()
-                    }
-                }} autoPlay playsInline controls={true} ></video>
+                isScreenShareOn && <VIdeo stream={screenShareStream!} />    
             }
-            {
-                isAudioOn && <audio ref={(re) => {
-                    if (re) {
-                        re.srcObject = audioStream;
-                        re.play()
-                    }
-                }} autoPlay playsInline controls={true} />
-            }
+           
 
         </div>
+
         <hr />
         <div>
             {peers.map((peer, key) => (
                 <div key={key}>
                     Peer Id: {peer.socketId}
-
-                    {peer.isVideoOn && <video ref={(re) => {
-                        if (re) {
-                            re.srcObject = peer.videoStream;
-                        }
-                    }} autoPlay playsInline muted />}
-                    {peer.isAudioOn && <audio ref={(re) => {
-                        if (re) {
-                            re.srcObject = peer.audioStream;
-                        }
-                    }} autoPlay playsInline />}
-                    {peer.isScreenShareOn && <video ref={(re) => {
-                        if (re) {
-                            re.srcObject = peer.screenShareStream;
-                        }
-                    }} autoPlay playsInline />}
+                    {peer.isScreenShareOn && <VIdeo stream={peer.screenShareStream!} />}
+                    {peer.isVideoOn && <VIdeo stream={peer.videoStream!} />}
+                    {peer.isAudioOn && <AUdeo stream={peer.audioStream!} />}
+                   
                 </div>
             ))}
         </div>
