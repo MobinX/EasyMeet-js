@@ -368,7 +368,7 @@ index.html
     <script src="https://unpkg.com/jquery@3.7.1/dist/jquery.js"></script>
     <!-- <script src="scripts/jquery.signalR-2.2.2.min.js"></script> -->
     <!-- <script src="https://localhost:44338/signalr/hubs"></script> -->
-    <script src="https://unpkg.com/@easymeet/core@1.0.1/dist/easy-meet.min.js"></script>
+    <script src="https://unpkg.com/@easymeet/core@1.0.2/dist/easy-meet.min.js"></script>
     <!-- <script type="module">
         import WebrtcBase from './dist/index.js';
        
