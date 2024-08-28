@@ -1,6 +1,6 @@
 {
   "author": "MobinX",
-  "name": "@easymeet/core",
+  "name": "@mobinx/easymeet",
   "description": "The easiest WebRTC, peer to peer video, audio calling and file transfering library for React and vanilla JS",
   "version": "1.0.2",
   "license": "MIT",

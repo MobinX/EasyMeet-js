@@ -15,7 +15,7 @@
 ## Installation:
 
 ```bash
-npm install @easymeet/core
+npm install @mobinx/easymeet
 ```
 
 ## Usage: (React Next.js - using meterd iceServers and ably as socket server)
@@ -24,9 +24,9 @@ Meet.tsx
 ```typescript
 "use client"
 import Ably from "ably";
-import { useEasyMeet } from "@easymeet/core/react";
+import { useEasyMeet } from "@mobinx/easymeet/react";
 import { useEffect, useRef, useState } from "react";
-import { FileState } from "@easymeet/core";
+import { FileState } from "@mobinx/easymeet";
 
 const ably = new Ably.Realtime({ key: 'your-ably-api-key', clientId: Math.random().toString(36).substring(7) })
 ably.connection.once('connected').then(() => {
@@ -368,7 +368,7 @@ index.html
     <script src="https://unpkg.com/jquery@3.7.1/dist/jquery.js"></script>
     <!-- <script src="scripts/jquery.signalR-2.2.2.min.js"></script> -->
     <!-- <script src="https://localhost:44338/signalr/hubs"></script> -->
-    <script src="https://unpkg.com/@easymeet/core@1.0.2/dist/easy-meet.min.js"></script>
+    <script src="https://unpkg.com/@mobinx/easymeet@1.0.2/dist/easy-meet.min.js"></script>
     <!-- <script type="module">
         import WebrtcBase from './dist/index.js';
        
@@ -700,7 +700,7 @@ app.js
 ## Public API for core library (vanilla js)
 **Public Methods:**
 
-This table provides a detailed description of all public methods available in the `WebrtcBase` class from @easymeet/core:
+This table provides a detailed description of all public methods available in the `WebrtcBase` class from @mobinx/easymeet:
 
 like 
 ```javascript
@@ -744,9 +744,9 @@ let webrtc = new EasyMeet.WebrtcBase("you-socket-id", iceServers, sendmsg /*the 
 ## Public Method of React Hook (useEasyMeet)
 
 You can use those from 
-@easymeet/core/react
+@mobinx/easymeet/react
 ```javascript
-import {useEasyMeet} from "@easymeet/core/react"
+import {useEasyMeet} from "@mobinx/easymeet/react"
 let {startCamera, isVideoOn , isAudioOn , peers, fileSharingState ...and more} = useEasyMeet("you-socket-id", iceServers, sendmsg /*the function used by easymeet system for sending msg to other over socket, takes msg and to ,two perameter , see usages example avobe */)
 ```
 
