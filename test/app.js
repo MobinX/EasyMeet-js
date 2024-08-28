@@ -230,23 +230,6 @@
     let isWrtcInit = false;
     const ably = new Ably.Realtime({ key: 'YSXfdw.ksCpsA:Bf6jKYu4LPPpMfiFkSMJrZ4q4ArLDkuBf7bJCPxKQUo', clientId: Math.random().toString(36).substring(7) });
     ably.connection.once('connected').then(async () => {
-        const response2 = await fetch('https://global.xirsys.net/_turn/sigflow', {
-            method: 'PUT',
-            headers: {
-                'Authorization': 'Basic ' + btoa('mobin:e2d2ad94-0e2b-11eb-85a4-0242ac150006'),
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({})
-        });
-
-        const data = await response2.json();
-        console.log('response: ', data);
-        // const iceServers = await response.json();
-        const iceServers = data.v.iceServers;
-        if (!isWrtcInit) {
-            // easymeet = new easymeetcBase(sendmsg, ably.auth.clientId, iceServers);
-            isWrtcInit = true;
-        }
         console.log('Connected to Ably!');
     })
     const myid = ably.auth.clientId;
@@ -274,25 +257,7 @@
             if (message.data.to === myid) {
                 //checking if the msg is for me
                 console.log('message received from: ' + message.clientId);
-                if (!isWrtcInit) {
-                    const response2 = await fetch('https://global.xirsys.net/_turn/sigflow', {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': 'Basic ' + btoa('mobin:e2d2ad94-0e2b-11eb-85a4-0242ac150006'),
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({})
-                    });
-
-                    const data = await response2.json();
-                    console.log('response: ', data);
-                    // const iceServers = await response.json();
-                    const iceServers = data.v.iceServers;
-                    if (!isWrtcInit) {
-                        // easymeet = new easymeetcBase(sendmsg, ably.auth.clientId, iceServers);
-                        isWrtcInit = true;
-                    }
-                }
+               
                 console.log(message);
                 await easymeet.onSocketMessage(message.data.data, message.clientId);
 
@@ -339,14 +304,7 @@
         });
 
     });
-    $("#btnsendfile2").on('click', async function () {
-        let file = document.getElementById('fileinput2').files[0];
-        console.log(file);
-        (easymeet.getAllPeerDetails()).forEach(element => {
-            console.log(element.socketId);
-            easymeet.sendFile(element.socketId, file);
-        });
-    });
+ 
 
     easymeet.onCameraVideoStateChange((state, stream) => {
         if (state) {

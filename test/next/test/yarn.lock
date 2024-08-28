@@ -295,6 +295,11 @@
   dependencies:
     "@types/node" "*"
 
+"@types/webrtc@^0.0.43":
+  version "0.0.43"
+  resolved "https://registry.yarnpkg.com/@types/webrtc/-/webrtc-0.0.43.tgz#6a102c82daff5c3560cf8074707ad7055b9fa045"
+  integrity sha512-W5FyScaZ+nLb0CXP/4UaRiNr042RwW/RnLUZYt0uwveZN8w+X1gtt0bYIg9oMzt5ODiU/aQV/kyCFv24wfNrXA==
+
 "@typescript-eslint/parser@^5.4.2 || ^6.0.0 || 7.0.0 - 7.2.0":
   version "7.2.0"
   resolved "https://registry.yarnpkg.com/@typescript-eslint/parser/-/parser-7.2.0.tgz#44356312aea8852a3a82deebdacd52ba614ec07a"

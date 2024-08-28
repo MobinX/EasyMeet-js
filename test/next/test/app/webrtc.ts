@@ -123,7 +123,7 @@ export class WebrtcBase {
 
       connection.onicecandidateerror = (event) => {
         console.log(connid + " onicecandidateerror", event);
-        this._emitError("Failed to Gather ICE Candidate");
+        // this._emitError("Failed to Gather ICE Candidate");
       };
 
       connection.onicegatheringstatechange = (event) => {
@@ -154,7 +154,7 @@ export class WebrtcBase {
         };
         this._dataChannels[connid].onerror = (event) => {
           console.log(connid + " data channel onerror", event);
-          this._emitError("Data Channel Error");
+          this._emitError("Data Channel Error, please refresh the page");
         };
       }
 
@@ -193,7 +193,7 @@ export class WebrtcBase {
               lastTimeStamp: Date.now(),
             };
             this._emitFileStateChange(fileid);
-            console.log( this._fileStates[fileid].completedSize ==
+            console.log(this._fileStates[fileid].completedSize ==
               this._fileStates[fileid].totalSize)
             if (
               this._fileStates[fileid].completedSize ==
@@ -212,7 +212,7 @@ export class WebrtcBase {
           };
           this._fileTransferingDataChennels[fileid].onerror = (event) => {
             console.log(connid + "file data channel onerror", event);
-            this._emitError("Data Channel Error");
+            this._emitError("Data Channel Error, please refresh the page");
           };
 
           return;
@@ -230,7 +230,7 @@ export class WebrtcBase {
         };
         this._dataChannels[connid].onerror = (event) => {
           console.log(connid + " data channel onerror", event);
-          this._emitError("Data Channel Error");
+          this._emitError("Data Channel Error, please refresh the page");
         };
       };
 
@@ -297,7 +297,7 @@ export class WebrtcBase {
           //     this._remoteScreenShareStreams[connid].addTrack(event.track);
           //   }
           // } else
-           if (
+          if (
             this._remoteScreenShareTrackIds[connid] &&
             this._remoteScreenShareTrackIds[connid] == event.track.id
           ) {
@@ -344,6 +344,7 @@ export class WebrtcBase {
           console.log("update state: onmute", connid);
           this._updatePeerState();
         };
+        
       };
       this._peers_ids[connid] = connid;
       this._peerConnections[connid] = connection;
@@ -382,8 +383,8 @@ export class WebrtcBase {
         this._offferMakingStatePeers[connid] = true;
         console.log(
           connid +
-            " creating offer: connenction.signalingState:" +
-            connection?.signalingState
+          " creating offer: connenction.signalingState:" +
+          connection?.signalingState
         );
         let offer = await connection?.createOffer();
         await connection?.setLocalDescription(offer);
@@ -399,7 +400,7 @@ export class WebrtcBase {
       }
     } catch (err) {
       console.log(err);
-      this._emitError(err);
+      this._emitError("Internal Webrtc Error , please refresh the page");
     } finally {
       this._offferMakingStatePeers[connid] = false;
     }
@@ -416,8 +417,8 @@ export class WebrtcBase {
       if (!this._peerConnections[from_connid]) {
         console.log(
           "peer " +
-            from_connid +
-            " not found , creating connection for ice candidate"
+          from_connid +
+          " not found , creating connection for ice candidate"
         );
         await this.createConnection(from_connid, false, extraInfo);
       }
@@ -427,7 +428,7 @@ export class WebrtcBase {
         );
       } catch (err) {
         console.log(err);
-        this._emitError("falled to add ice candidate");
+        // this._emitError("falled to add ice candidate");
       }
     } else if (msg.offer) {
       console.log(from_connid, " offer", msg.offer);
@@ -466,7 +467,7 @@ export class WebrtcBase {
         }
       } catch (err) {
         console.log(err);
-        this._emitError("falled to create answer");
+        this._emitError("Internal Webrtc Error , please refresh the page");
       }
     } else if (msg.answer) {
       try {
@@ -481,7 +482,7 @@ export class WebrtcBase {
         }
       } catch (err) {
         console.log(err);
-        this._emitError("falled to set remote description");
+        this._emitError("Internal Webrtc Error , please refresh the page");
       }
     } else if (msg.screenShareTrackId) {
       console.log(from_connid, " screenShareTrackId", msg.screenShareTrackId);
@@ -496,6 +497,16 @@ export class WebrtcBase {
       //   );
       // }
       if (this._isScreenShareMuted) await this._startScreenShare();
+    }
+    else if (msg.screenShareOff){
+      console.log(from_connid, " screenShareOff", msg.screenShareOff);
+      if (this._remoteScreenShareStreams[from_connid]) {
+        this._remoteScreenShareStreams[from_connid]
+          .getTracks()
+          .forEach((t) => t.stop && t.stop());
+        this._remoteScreenShareStreams[from_connid] = null;
+        this._updatePeerState();
+      }
     }
   }
 
@@ -633,8 +644,8 @@ export class WebrtcBase {
         } else {
           this._emitError(
             "Failed to transfer file " +
-              data.fileName +
-              " because peer is not connected"
+            data.fileName +
+            " because peer is not connected"
           );
           return;
         }
@@ -820,7 +831,7 @@ export class WebrtcBase {
             !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
           isScreenShareOn:
             this._remoteScreenShareStreams[connid] != null &&
-            this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.enabled  &&  !(this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted),
+            this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.enabled ,
           audioStream: this._remoteAudioStreams[connid],
           videoStream: this._remoteVideoStreams[connid],
           screenShareStream: this._remoteScreenShareStreams[connid],
@@ -887,8 +898,8 @@ export class WebrtcBase {
           this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.enabled &&
           !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
         isScreenShareOn: this._remoteScreenShareStreams[connid] != null &&
-        this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.enabled &&
-        !(this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted),
+          this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.enabled &&
+          !(this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted),
         audioStream: this._remoteAudioStreams[connid],
         videoStream: this._remoteVideoStreams[connid],
         screenShareStream: this._remoteScreenShareStreams[connid],
@@ -964,7 +975,7 @@ export class WebrtcBase {
       this._isVideoMuted = false;
     } catch (e) {
       console.log(e);
-      this._emitError("Failed to start camera");
+      this._emitError("Failed to start camera,maybe pemission denied, Please Allow");
     }
   }
 
@@ -1040,112 +1051,142 @@ export class WebrtcBase {
       audio: false,
     }
   ) {
-  
-      // let screenStream = await navigator.mediaDevices.getDisplayMedia(
-      //   screenConfig
-      // );
-      // screenStream.oninactive = (e: any) => {
+
+    // let screenStream = await navigator.mediaDevices.getDisplayMedia(
+    //   screenConfig
+    // );
+    // screenStream.oninactive = (e: any) => {
+    //     this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
+    //     this._emitScreenShareState(false);
+    // }
+    // this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
+    // if (screenStream && screenStream.getVideoTracks().length > 0) {
+    //   this._screenShareTrack = screenStream.getVideoTracks()[0];
+    //   this._emitScreenShareState(true);
+
+
+    try {
+      let videoStream = await navigator.mediaDevices.getDisplayMedia(screenConfig);
+
+      this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
+      if (videoStream && videoStream.getVideoTracks().length > 0) {
+        this._screenShareTrack = videoStream.getVideoTracks()[0];
+
+        this._screenShareTrack.onended = () => {
+          console.log("onended screen share");
+          this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
+          this._emitScreenShareState(false);
+          this._isScreenShareMuted = true;
+          for (let connid in this._peerConnections)
+            this._serverFn(
+              JSON.stringify({
+               screenShareOff: true
+              }),
+              connid
+            );
+        }
+      
+      //   // @ts-ignore
+      //   this._screenShareTrack.oninactive = (e: any) => {
+      //     console.log("oninactive screen share", e);
       //     this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
       //     this._emitScreenShareState(false);
+      //     this._isScreenShareMuted = true;
       // }
-      // this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
-      // if (screenStream && screenStream.getVideoTracks().length > 0) {
-      //   this._screenShareTrack = screenStream.getVideoTracks()[0];
-      //   this._emitScreenShareState(true);
-     
-
-      try {
-        let videoStream = await navigator.mediaDevices.getDisplayMedia(screenConfig);
-        this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
-        if (videoStream && videoStream.getVideoTracks().length > 0) {
-          this._screenShareTrack = videoStream.getVideoTracks()[0];
-          this._emitScreenShareState(true);
-          this._AlterAudioVideoSenders(this._screenShareTrack, this._rtpScreenShareSenders);
-        }
+      this._emitScreenShareState(true);
+      this._AlterAudioVideoSenders(this._screenShareTrack, this._rtpScreenShareSenders);
+    }
         this._isScreenShareMuted = false;
-      } catch (e) {
-        console.log(e);
-        this._emitError("Failed to start screen share");
-      }
-
-
-
-      // for (let connid in this._peerConnections)
-      //   this._serverFn(
-      //     JSON.stringify({
-      //       screenShareTrackId: this._isVideoMuted
-      //         ? "CAMERA OFF"
-      //         : "CAMERA ON-" + this._videoTrack?.id,
-      //     }),
-      //     connid
-      //   );
-      // }
-      // this._isScreenShareMuted = false;
+  } catch(e) {
+    console.log(e);
+    this._emitError("Failed to start screen share,maybe pemission denied, Please Allow");
   }
 
-  stopScreenShare() {
-    this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
-    this._emitScreenShareState(false);
-    this._isScreenShareMuted = true;
-  }
+
+
+  // for (let connid in this._peerConnections)
+  //   this._serverFn(
+  //     JSON.stringify({
+  //       screenShareTrackId: this._isVideoMuted
+  //         ? "CAMERA OFF"
+  //         : "CAMERA ON-" + this._videoTrack?.id,
+  //     }),
+  //     connid
+  //   );
+  // }
+  // this._isScreenShareMuted = false;
+}
+
+stopScreenShare() {
+  this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
+  this._emitScreenShareState(false);
+  this._isScreenShareMuted = true;
+  for (let connid in this._peerConnections)
+    this._serverFn(
+      JSON.stringify({
+       screenShareOff: true
+      }),
+      connid
+    );
+}
 
   async toggleScreenShare() {
-    if (this._isScreenShareMuted) await this.startScreenShare();
-    else this.stopScreenShare();
-  }
+  if (this._isScreenShareMuted) await this.startScreenShare();
+  else this.stopScreenShare();
+}
 
   async startAudio() {
-    try {
-      if (!this._audioTrack) {
-        let audioStream = await navigator.mediaDevices.getUserMedia({
-          video: false,
-          audio: true,
-        });
-        this._audioTrack = audioStream.getAudioTracks()[0];
-      }
-
-      if (this._isAudioMuted) {
-        this._audioTrack.enabled = true;
-        this._isAudioMuted = false;
-        this._AlterAudioVideoSenders(this._audioTrack, this._rtpAudioSenders);
-        this._emitAudioState(true);
-      }
-    } catch (e) {
-      console.log(e);
-      this._emitError("Failed to start audio");
+  try {
+    if (!this._audioTrack) {
+      let audioStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: true,
+      });
+      this._audioTrack = audioStream.getAudioTracks()[0];
     }
+
+    if (this._isAudioMuted) {
+      this._audioTrack.enabled = true;
+      this._isAudioMuted = false;
+      this._AlterAudioVideoSenders(this._audioTrack, this._rtpAudioSenders);
+      this._emitAudioState(true);
+    }
+  } catch (e) {
+    console.log(e);
+    this._emitError("Failed to start audio,maybe pemission denied, Please Allow");
   }
+}
 
   async stopAudio() {
-    if (this._audioTrack) {
-      this._audioTrack.enabled = false;
-      this._isAudioMuted = true;
-      this._RemoveAudioVideoSenders(this._rtpAudioSenders);
-      this._emitAudioState(false);
-    }
+  if (this._audioTrack) {
+    this._audioTrack.enabled = false;
+    this._isAudioMuted = true;
+    this._RemoveAudioVideoSenders(this._rtpAudioSenders);
+    this._emitAudioState(false);
   }
+}
   async toggleAudio() {
-    if (this._isAudioMuted) await this.startAudio();
-    else await this.stopAudio();
-  }
+  if (this._isAudioMuted) await this.startAudio();
+  else await this.stopAudio();
+}
 
-  isLocalAudioOn() {
-    return !this._isAudioMuted;
-  }
+isLocalAudioOn() {
+  return !this._isAudioMuted;
+}
 
-  isLocalVideoOn() {
-    return !this._isVideoMuted;
-  }
+isLocalVideoOn() {
+  return !this._isVideoMuted;
+}
 
-  isLocalScreenShareOn() {
-    return !this._isScreenShareMuted;
-  }
+isLocalScreenShareOn() {
+  return !this._isScreenShareMuted;
+}
 
-  // callback handlers
-  onError(fn: Function) {
-    this._onError.push(fn);
-  }
-  _emitError(error: any) {
-    this._onError.forEach((fn) => fn(error));
-  }
+// callback handlers
+onError(fn: Function) {
+  this._onError.push(fn);
+}
+_emitError(error: any) {
+  this._onError.forEach((fn) => fn(error));
+}
 }
