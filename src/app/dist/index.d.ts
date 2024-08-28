@@ -11,7 +11,18 @@ interface PeerStateChangedHandler {
         isPolite: boolean;
     }[]): void;
 }
-interface FileState {
+export interface peerState {
+    socketId: string;
+    info: any;
+    isAudioOn: boolean;
+    isVideoOn: boolean;
+    isScreenShareOn: boolean;
+    audioStream: MediaStream | null;
+    videoStream: MediaStream | null;
+    screenShareStream: MediaStream | null;
+    isPolite: boolean;
+}
+export interface FileState {
     fileId: string;
     totalSize: number;
     completedSize: number;
@@ -118,11 +129,9 @@ export declare class WebrtcBase {
     onAudioStateChange(fn: (state: boolean, stream: MediaStream | null) => void): void;
     stopCamera(): void;
     toggleCamera(): Promise<void>;
+    _startScreenShare(): Promise<void>;
     startScreenShare(screenConfig?: {
-        video: {
-            width: number;
-            height: number;
-        };
+        video: boolean;
         audio: boolean;
     }): Promise<void>;
     stopScreenShare(): void;
