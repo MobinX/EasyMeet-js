@@ -39,11 +39,13 @@ export declare class WebrtcBase {
     private _videoTrack;
     private _screenShareTrack;
     private _peerConnections;
+    private _peerConnectionsForScreenShare;
     private _peers_ids;
     private _peersInfo;
     private _politePeerStates;
     private _remoteScreenShareTrackIds;
     private _offferMakingStatePeers;
+    private _offferMakingStatePeersForScreenShare;
     private _fileStates;
     private _fileTransferingDataChennels;
     private _fileTransferingPeers;
@@ -72,7 +74,7 @@ export declare class WebrtcBase {
     private _onError;
     constructor(my_connid: string, iceConfiguration: RTCConfiguration, serverFn: Function);
     createConnection(connid: string, politePeerState: boolean, extraInfo?: any | null): Promise<void>;
-    _createOffer(connid: string): Promise<void>;
+    _createOffer(connid: string, forScreenShare?: boolean): Promise<void>;
     onSocketMessage(message: any, from_connid: string, extraInfo?: any | null): Promise<void>;
     _isConnectionAlive(connenction: RTCPeerConnection): boolean;
     closeConnection(connid: string): void;
@@ -110,16 +112,15 @@ export declare class WebrtcBase {
         screenShareStream: MediaStream | null;
         isPolite: boolean;
     } | null;
-    _AlterAudioVideoSenders(track: MediaStreamTrack, rtpSenders: any): void;
-    _RemoveAudioVideoSenders(rtpSenders: any): void;
+    _AlterAudioVideoSenders(track: MediaStreamTrack, rtpSenders: any, forScreenShare?: boolean): void;
+    _RemoveAudioVideoSenders(rtpSenders: any, forScreenShare?: boolean): void;
     _ClearCameraVideoStreams(_rtpVideoSenders: any): void;
     _ClearScreenVideoStreams(_rtpScreenSenders: any): void;
     startCamera(cameraConfig?: {
-        video: {
+        video: boolean | {
             width: number;
             height: number;
         };
-        audio: boolean;
     }): Promise<void>;
     _emitCameraVideoState(state: boolean): void;
     onCameraVideoStateChange(fn: (state: boolean, stream: MediaStream | null) => void): void;
@@ -128,14 +129,28 @@ export declare class WebrtcBase {
     _emitAudioState(state: boolean): void;
     onAudioStateChange(fn: (state: boolean, stream: MediaStream | null) => void): void;
     stopCamera(): void;
-    toggleCamera(): Promise<void>;
+    toggleCamera(cameraConfig?: {
+        video: boolean | {
+            width: number;
+            height: number;
+        };
+    }): Promise<void>;
     _startScreenShare(): Promise<void>;
     startScreenShare(screenConfig?: {
-        video: boolean;
+        video: boolean | {
+            width: number;
+            height: number;
+        };
         audio: boolean;
     }): Promise<void>;
     stopScreenShare(): void;
-    toggleScreenShare(): Promise<void>;
+    toggleScreenShare(screenConfig?: {
+        video: boolean | {
+            width: number;
+            height: number;
+        };
+        audio: boolean;
+    }): Promise<void>;
     startAudio(): Promise<void>;
     stopAudio(): Promise<void>;
     toggleAudio(): Promise<void>;

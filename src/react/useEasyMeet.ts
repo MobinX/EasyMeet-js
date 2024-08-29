@@ -11,12 +11,12 @@ export interface easyMeetInterface {
   webRTCBaseRef: MutableRefObject<WebrtcBase | null>;
   error: { type: "sys-error" | "webrtc-error"; message: string } | null;
   onSocketMessage: (message: string, from_connid: string, extraInfo: any | null) => Promise<void>;
-  startCamera: (cameraConfig?: { video: { width: number; height: number; }; audio: boolean; }) => Promise<void>;
+  startCamera: (cameraConfig?: { video: { width: number; height: number; }}) => Promise<void>;
   stopCamera: Function;
   startScreenShare: (screenConfig?: { video: { width: number; height: number; }; audio: boolean; }) => Promise<void>;
   stopScreenShare: Function;
-  toggleCamera: () => Promise<void>;
-  toggleScreenShare: () => Promise<void>;
+  toggleCamera: (cameraConfig?: { video: boolean| { width: number; height: number; } }) => Promise<void>;
+  toggleScreenShare: (screenConfig?: { video: boolean | { width: number; height: number; }; audio: boolean; }) => Promise<void>;
   startAudio: Function;
   stopAudio: Function;
   toggleAudio: () => Promise<void>;
@@ -206,7 +206,12 @@ export const useEasyMeet = (
 
   const startCamera = useCallback(
     async (
-      cameraConfig = { video: { width: 640, height: 480 }, audio: false }
+      cameraConfig:{ video: boolean | { width: number; height: number; }} = {
+        video: {
+          width: 640,
+          height: 480,
+        }
+      }
     ) => {
       if (webRTCBaseRef.current) {
         await webRTCBaseRef.current.startCamera(cameraConfig);
@@ -225,9 +230,12 @@ export const useEasyMeet = (
     }
   }, [webRTCBaseRef]);
 
-  const startScreenShare = useCallback(async () => {
+  const startScreenShare = useCallback(async ( screenConfig: { video: boolean | { width: number; height: number; }; audio: boolean; } = {
+    video: true,
+    audio: false,
+  }) => {
     if (webRTCBaseRef.current) {
-      await webRTCBaseRef.current.startScreenShare();
+      await webRTCBaseRef.current.startScreenShare(screenConfig);
     } else {
       setError({ type: "sys-error", message: "Webrtc System is not ready" });
     }
@@ -241,17 +249,17 @@ export const useEasyMeet = (
     }
   }, [webRTCBaseRef]);
 
-  const toggleCamera = useCallback(async () => {
+  const toggleCamera = useCallback(async (cameraConfig: { video: boolean | { width: number; height: number; }} = { video: true }) => {
     if (webRTCBaseRef.current) {
-      await webRTCBaseRef.current.toggleCamera();
+      await webRTCBaseRef.current.toggleCamera(cameraConfig);
     } else {
       setError({ type: "sys-error", message: "Webrtc System is not ready" });
     }
   }, [webRTCBaseRef]);
 
-  const toggleScreenShare = useCallback(async () => {
+  const toggleScreenShare = useCallback(async (screenConfig: { video: boolean | { width: number; height: number; }; audio: boolean; }={ video: true, audio: false }) => {
     if (webRTCBaseRef.current) {
-      await webRTCBaseRef.current.toggleScreenShare();
+      await webRTCBaseRef.current.toggleScreenShare(screenConfig);
     } else {
       setError({ type: "sys-error", message: "Webrtc System is not ready" });
     }

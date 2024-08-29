@@ -12,7 +12,6 @@ export interface easyMeetInterface {
             width: number;
             height: number;
         };
-        audio: boolean;
     }) => Promise<void>;
     stopCamera: Function;
     startScreenShare: (screenConfig?: {
@@ -23,8 +22,19 @@ export interface easyMeetInterface {
         audio: boolean;
     }) => Promise<void>;
     stopScreenShare: Function;
-    toggleCamera: () => Promise<void>;
-    toggleScreenShare: () => Promise<void>;
+    toggleCamera: (cameraConfig?: {
+        video: boolean | {
+            width: number;
+            height: number;
+        };
+    }) => Promise<void>;
+    toggleScreenShare: (screenConfig?: {
+        video: boolean | {
+            width: number;
+            height: number;
+        };
+        audio: boolean;
+    }) => Promise<void>;
     startAudio: Function;
     stopAudio: Function;
     toggleAudio: () => Promise<void>;

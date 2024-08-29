@@ -46,12 +46,17 @@ export class WebrtcBase {
   // peer states
 
   private _peerConnections: { [id: string]: RTCPeerConnection | null } = {};
+  private _peerConnectionsForScreenShare: {
+    [id: string]: RTCPeerConnection | null;
+  } = {};
+
   private _peers_ids: { [id: string]: string | null } = {};
   private _peersInfo: { [id: string]: any | null } = {};
   private _politePeerStates: { [id: string]: boolean } = {};
   private _remoteScreenShareTrackIds: { [id: string]: string | null } = {};
 
   private _offferMakingStatePeers: { [id: string]: boolean } = {};
+  private _offferMakingStatePeersForScreenShare: { [id: string]: boolean } = {};
 
   // file transfers
   private _fileStates: { [fileid: string]: FileState } = {};
@@ -193,8 +198,10 @@ export class WebrtcBase {
               lastTimeStamp: Date.now(),
             };
             this._emitFileStateChange(fileid);
-            console.log(this._fileStates[fileid].completedSize ==
-              this._fileStates[fileid].totalSize)
+            console.log(
+              this._fileStates[fileid].completedSize ==
+                this._fileStates[fileid].totalSize
+            );
             if (
               this._fileStates[fileid].completedSize ==
               this._fileStates[fileid].totalSize
@@ -322,6 +329,14 @@ export class WebrtcBase {
               .getVideoTracks()
               .forEach((t) => this._remoteVideoStreams[connid]?.removeTrack(t));
             this._remoteVideoStreams[connid].addTrack(event.track);
+            event.track.onunmute = () => {
+              console.log("update state: onunmute", connid);
+              this._updatePeerState();
+            };
+            event.track.onmute = () => {
+              console.log("update state: onmute", connid);
+              this._updatePeerState();
+            };
             // this._remoteVideoStreams[connid].getTracks().forEach(t => console.log(t));
           }
           console.log("update state: by video track");
@@ -334,20 +349,99 @@ export class WebrtcBase {
           this._remoteAudioStreams[connid].addTrack(event.track);
           // this._remoteAudioStreams[connid].getTracks().forEach(t => console.log(t));
           console.log("update state: by audio track");
+          event.track.onunmute = () => {
+            console.log("update state: onunmute", connid);
+            this._updatePeerState();
+          };
+          event.track.onmute = () => {
+            console.log("update state: onmute", connid);
+            this._updatePeerState();
+          };
           this._updatePeerState();
         }
-        event.track.onunmute = () => {
-          console.log("update state: onunmute", connid);
-          this._updatePeerState();
-        };
-        event.track.onmute = () => {
-          console.log("update state: onmute", connid);
-          this._updatePeerState();
-        };
-        
       };
+
+      let connectionForScreenShare = new RTCPeerConnection(
+        this._iceConfiguration
+      );
+      console.log("creating connectionForScreenShare", connid);
+      connectionForScreenShare.onicecandidate = (event) => {
+        if (event.candidate) {
+          this._serverFn(
+            JSON.stringify({
+              iceCandidate: event.candidate,
+              forScreenShare: true,
+            }),
+            connid
+          );
+        }
+      };
+
+      connectionForScreenShare.onicecandidateerror = (event) => {
+        console.log(
+          connid + " onicecandidateerror connectionForScreenShare",
+          event
+        );
+        // this._emitError("Failed to Gather ICE Candidate");
+      };
+
+      connectionForScreenShare.onicegatheringstatechange = (event) => {
+        console.log(
+          connid + " onicegatheringstatechange connectionForScreenShare",
+          event
+        );
+      };
+
+      connectionForScreenShare.oniceconnectionstatechange = () => {
+        console.log(
+          connid + " connectionForScreenShare peer ice connection state: ",
+          connectionForScreenShare.iceConnectionState
+        );
+        if (connectionForScreenShare.iceConnectionState === "failed") {
+          connectionForScreenShare.restartIce();
+        }
+      };
+
+      connectionForScreenShare.onnegotiationneeded = async (event) => {
+        console.log(connid + " onnegotiationneeded", event);
+        await this._createOffer(connid, true);
+      };
+
+      connectionForScreenShare.onconnectionstatechange = (event: any) => {
+        console.log(
+          connid + " connectionForScreenShare onconnectionstatechange",
+          event?.currentTarget?.connectionState
+        );
+        if (event.currentTarget.connectionState === "connected") {
+          console.log(connid + " connectionForScreenShare connected");
+        }
+        if (event.currentTarget.connectionState === "disconnected") {
+          console.log(connid + " connectionForScreenShare disconnected");
+        }
+      };
+
+      connectionForScreenShare.ontrack = (event) => {
+        console.log(connid + " connectionForScreenShare ontrack", event);
+
+        if (!this._remoteScreenShareStreams[connid]) {
+          this._remoteScreenShareStreams[connid] = new MediaStream();
+        }
+        this._remoteScreenShareStreams[connid]
+          .getVideoTracks()
+          .forEach((t) =>
+            this._remoteScreenShareStreams[connid]?.removeTrack(t)
+          );
+        this._remoteScreenShareStreams[connid].addTrack(event.track);
+
+        // this._remoteVideoStreams[connid].getTracks().forEach(t => console.log(t));
+
+        console.log("update state: by video track");
+        this._updatePeerState();
+      };
+
       this._peers_ids[connid] = connid;
       this._peerConnections[connid] = connection;
+      this._peerConnectionsForScreenShare[connid] = connectionForScreenShare;
       this._politePeerStates[connid] = politePeerState;
 
       if (extraInfo) {
@@ -364,7 +458,8 @@ export class WebrtcBase {
         // );
         this._AlterAudioVideoSenders(
           this._screenShareTrack,
-          this._rtpScreenShareSenders
+          this._rtpScreenShareSenders,
+          true
         );
       }
       if (this._audioTrack) {
@@ -376,15 +471,37 @@ export class WebrtcBase {
     }
   }
 
-  async _createOffer(connid: string) {
+  async _createOffer(connid: string, forScreenShare = false) {
     try {
+      if (forScreenShare) {
+        let connectionForScreenShare =
+          this._peerConnectionsForScreenShare[connid];
+        if (connectionForScreenShare != null) {
+          this._offferMakingStatePeersForScreenShare[connid] = true;
+          console.log(
+            connid +
+              " forScreenShare creating offer: connenction.signalingState:" +
+              connectionForScreenShare?.signalingState
+          );
+          let offer = await connectionForScreenShare?.createOffer();
+          await connectionForScreenShare?.setLocalDescription(offer);
+          this._serverFn(
+            JSON.stringify({
+              offer: connectionForScreenShare?.localDescription,
+              forScreenShare: true,
+            }),
+            connid
+          );
+        }
+        return;
+      }
       let connection = this._peerConnections[connid];
       if (connection != null) {
         this._offferMakingStatePeers[connid] = true;
         console.log(
           connid +
-          " creating offer: connenction.signalingState:" +
-          connection?.signalingState
+            " creating offer: connenction.signalingState:" +
+            connection?.signalingState
         );
         let offer = await connection?.createOffer();
         await connection?.setLocalDescription(offer);
@@ -402,7 +519,11 @@ export class WebrtcBase {
       console.log(err);
       this._emitError("Internal Webrtc Error , please refresh the page");
     } finally {
-      this._offferMakingStatePeers[connid] = false;
+      if (forScreenShare) {
+        this._offferMakingStatePeersForScreenShare[connid] = false;
+      } else {
+        this._offferMakingStatePeers[connid] = false;
+      }
     }
   }
 
@@ -417,15 +538,21 @@ export class WebrtcBase {
       if (!this._peerConnections[from_connid]) {
         console.log(
           "peer " +
-          from_connid +
-          " not found , creating connection for ice candidate"
+            from_connid +
+            " not found , creating connection for ice candidate"
         );
+
         await this.createConnection(from_connid, false, extraInfo);
       }
       try {
-        await this._peerConnections[from_connid]?.addIceCandidate(
-          msg.iceCandidate
-        );
+        if (msg.forScreenShare) {
+          await this._peerConnectionsForScreenShare[
+            from_connid
+          ]?.addIceCandidate(msg.iceCandidate);
+        } else
+          await this._peerConnections[from_connid]?.addIceCandidate(
+            msg.iceCandidate
+          );
       } catch (err) {
         console.log(err);
         // this._emitError("falled to add ice candidate");
@@ -442,6 +569,42 @@ export class WebrtcBase {
         if (msg.screenid)
           this._remoteScreenShareTrackIds[from_connid] = msg.screenid;
         if (this._peerConnections[from_connid]) {
+          if (
+            msg.forScreenShare &&
+            this._peerConnectionsForScreenShare[from_connid]
+          ) {
+            const offerCollision =
+              this._offferMakingStatePeersForScreenShare[from_connid] ||
+              this._peerConnectionsForScreenShare[from_connid]
+                ?.signalingState !== "stable";
+            if (offerCollision && !this._politePeerStates[from_connid]) {
+              console.log("ignoring Offer", from_connid);
+              return;
+            }
+
+            await this._peerConnectionsForScreenShare[
+              from_connid
+            ].setRemoteDescription(new RTCSessionDescription(msg.offer));
+            let answer =
+              await this._peerConnectionsForScreenShare[
+                from_connid
+              ].createAnswer();
+            await this._peerConnectionsForScreenShare[
+              from_connid
+            ].setLocalDescription();
+            this._serverFn(
+              JSON.stringify({
+                answer:
+                  this._peerConnectionsForScreenShare[from_connid]
+                    .localDescription,
+                forScreenShare: true,
+              }),
+              from_connid
+            );
+
+            return;
+          }
+
           const offerCollision =
             this._offferMakingStatePeers[from_connid] ||
             this._peerConnections[from_connid]?.signalingState !== "stable";
@@ -476,6 +639,15 @@ export class WebrtcBase {
             this._remoteScreenShareTrackIds[from_connid] = msg.screenid;
 
           console.log(from_connid, " answer", msg.answer);
+          if (
+            msg.forScreenShare &&
+            this._peerConnectionsForScreenShare[from_connid]
+          ) {
+            await this._peerConnectionsForScreenShare[
+              from_connid
+            ].setRemoteDescription(new RTCSessionDescription(msg.answer));
+            return;
+          }
           await this._peerConnections[from_connid].setRemoteDescription(
             new RTCSessionDescription(msg.answer)
           );
@@ -497,8 +669,7 @@ export class WebrtcBase {
       //   );
       // }
       if (this._isScreenShareMuted) await this._startScreenShare();
-    }
-    else if (msg.screenShareOff){
+    } else if (msg.screenShareOff) {
       console.log(from_connid, " screenShareOff", msg.screenShareOff);
       if (this._remoteScreenShareStreams[from_connid]) {
         this._remoteScreenShareStreams[from_connid]
@@ -525,6 +696,10 @@ export class WebrtcBase {
       this._peers_ids[connid] = null;
       this._peerConnections[connid].close();
       this._peerConnections[connid] = null;
+    }
+    if (this._peerConnectionsForScreenShare[connid]) {
+      this._peerConnectionsForScreenShare[connid].close();
+      this._peerConnectionsForScreenShare[connid] = null;
     }
     if (this._remoteAudioStreams[connid]) {
       this._remoteAudioStreams[connid]
@@ -644,8 +819,8 @@ export class WebrtcBase {
         } else {
           this._emitError(
             "Failed to transfer file " +
-            data.fileName +
-            " because peer is not connected"
+              data.fileName +
+              " because peer is not connected"
           );
           return;
         }
@@ -797,10 +972,8 @@ export class WebrtcBase {
           this._rtpScreenShareSenders
         );
       }
-    }
-    else {
+    } else {
       this._onDataChannelMsgCallback.forEach((fn) => fn(conId, msg));
-
     }
   }
 
@@ -831,7 +1004,8 @@ export class WebrtcBase {
             !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
           isScreenShareOn:
             this._remoteScreenShareStreams[connid] != null &&
-            this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.enabled ,
+            this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
+              ?.enabled,
           audioStream: this._remoteAudioStreams[connid],
           videoStream: this._remoteVideoStreams[connid],
           screenShareStream: this._remoteScreenShareStreams[connid],
@@ -871,8 +1045,7 @@ export class WebrtcBase {
           isScreenShareOn:
             this._remoteScreenShareStreams[connid] != null &&
             this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]
-              ?.enabled &&
-            !this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted,
+              ?.enabled,
           audioStream: this._remoteAudioStreams[connid],
           videoStream: this._remoteVideoStreams[connid],
           screenShareStream: this._remoteScreenShareStreams[connid],
@@ -897,9 +1070,9 @@ export class WebrtcBase {
           this._remoteVideoStreams[connid] != null &&
           this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.enabled &&
           !this._remoteVideoStreams[connid]?.getVideoTracks()[0]?.muted,
-        isScreenShareOn: this._remoteScreenShareStreams[connid] != null &&
-          this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.enabled &&
-          !(this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.muted),
+        isScreenShareOn:
+          this._remoteScreenShareStreams[connid] != null &&
+          this._remoteScreenShareStreams[connid]?.getVideoTracks()[0]?.enabled,
         audioStream: this._remoteAudioStreams[connid],
         videoStream: this._remoteVideoStreams[connid],
         screenShareStream: this._remoteScreenShareStreams[connid],
@@ -908,7 +1081,27 @@ export class WebrtcBase {
     } else return null;
   }
 
-  _AlterAudioVideoSenders(track: MediaStreamTrack, rtpSenders: any) {
+  _AlterAudioVideoSenders(
+    track: MediaStreamTrack,
+    rtpSenders: any,
+    forScreenShare: boolean = false
+  ) {
+    if (forScreenShare) {
+      for (let conId in this._peers_ids) {
+        if (
+          this._peerConnectionsForScreenShare[conId] &&
+          this._isConnectionAlive(this._peerConnectionsForScreenShare[conId])
+        ) {
+          if (rtpSenders[conId] && rtpSenders[conId].track) {
+            rtpSenders[conId].replaceTrack(track);
+          } else {
+            rtpSenders[conId] =
+              this._peerConnectionsForScreenShare[conId].addTrack(track);
+          }
+        }
+      }
+      return;
+    }
     for (let conId in this._peers_ids) {
       if (
         this._peerConnections[conId] &&
@@ -923,8 +1116,22 @@ export class WebrtcBase {
     }
   }
 
-  _RemoveAudioVideoSenders(rtpSenders: any) {
+  _RemoveAudioVideoSenders(rtpSenders: any, forScreenShare: boolean = false) {
     for (let conId in this._peers_ids) {
+      if (forScreenShare) {
+        if (
+          this._peerConnectionsForScreenShare[conId] &&
+          this._isConnectionAlive(this._peerConnectionsForScreenShare[conId])
+        ) {
+          if (rtpSenders[conId] && rtpSenders[conId].track) {
+            this._peerConnectionsForScreenShare[conId].removeTrack(
+              rtpSenders[conId]
+            );
+            rtpSenders[conId] = null;
+          }
+        }
+        return;
+      }
       if (
         this._peerConnections[conId] &&
         this._isConnectionAlive(this._peerConnections[conId])
@@ -951,17 +1158,16 @@ export class WebrtcBase {
       this._screenShareTrack.enabled = false;
       this._screenShareTrack.stop();
       this._screenShareTrack = null;
-      this._RemoveAudioVideoSenders(_rtpScreenSenders);
+      this._RemoveAudioVideoSenders(_rtpScreenSenders, true);
     }
   }
 
   async startCamera(
-    cameraConfig = {
+    cameraConfig:{ video: boolean | { width: number; height: number; }} = {
       video: {
         width: 640,
         height: 480,
-      },
-      audio: false,
+      }
     }
   ) {
     try {
@@ -975,7 +1181,9 @@ export class WebrtcBase {
       this._isVideoMuted = false;
     } catch (e) {
       console.log(e);
-      this._emitError("Failed to start camera,maybe pemission denied, Please Allow");
+      this._emitError(
+        "Failed to start camera,maybe pemission denied, Please Allow"
+      );
     }
   }
 
@@ -1022,8 +1230,15 @@ export class WebrtcBase {
     this._isVideoMuted = true;
   }
 
-  async toggleCamera() {
-    if (this._isVideoMuted) await this.startCamera();
+  async toggleCamera(
+    cameraConfig:{ video: boolean | { width: number; height: number; }} = {
+      video: {
+        width: 640,
+        height: 480,
+      }
+    }
+  ) {
+    if (this._isVideoMuted) await this.startCamera(cameraConfig);
     else this.stopCamera();
   }
 
@@ -1046,12 +1261,11 @@ export class WebrtcBase {
   }
 
   async startScreenShare(
-    screenConfig = {
+    screenConfig: { video: boolean | { width: number; height: number; }; audio: boolean; } = {
       video: true,
       audio: false,
     }
   ) {
-
     // let screenStream = await navigator.mediaDevices.getDisplayMedia(
     //   screenConfig
     // );
@@ -1064,9 +1278,9 @@ export class WebrtcBase {
     //   this._screenShareTrack = screenStream.getVideoTracks()[0];
     //   this._emitScreenShareState(true);
 
-
     try {
-      let videoStream = await navigator.mediaDevices.getDisplayMedia(screenConfig);
+      let videoStream =
+        await navigator.mediaDevices.getDisplayMedia(screenConfig);
 
       this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
       if (videoStream && videoStream.getVideoTracks().length > 0) {
@@ -1080,113 +1294,124 @@ export class WebrtcBase {
           for (let connid in this._peerConnections)
             this._serverFn(
               JSON.stringify({
-               screenShareOff: true
+                screenShareOff: true,
               }),
               connid
             );
-        }
-      
-      //   // @ts-ignore
-      //   this._screenShareTrack.oninactive = (e: any) => {
-      //     console.log("oninactive screen share", e);
-      //     this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
-      //     this._emitScreenShareState(false);
-      //     this._isScreenShareMuted = true;
-      // }
-      this._emitScreenShareState(true);
-      this._AlterAudioVideoSenders(this._screenShareTrack, this._rtpScreenShareSenders);
+        };
+
+        //   // @ts-ignore
+        //   this._screenShareTrack.oninactive = (e: any) => {
+        //     console.log("oninactive screen share", e);
+        //     this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
+        //     this._emitScreenShareState(false);
+        //     this._isScreenShareMuted = true;
+        // }
+        this._emitScreenShareState(true);
+        this._AlterAudioVideoSenders(
+          this._screenShareTrack,
+          this._rtpScreenShareSenders,
+          true
+        );
+      }
+      this._isScreenShareMuted = false;
+    } catch (e) {
+      console.log(e);
+      this._emitError(
+        "Failed to start screen share,maybe pemission denied, Please Allow"
+      );
     }
-        this._isScreenShareMuted = false;
-  } catch(e) {
-    console.log(e);
-    this._emitError("Failed to start screen share,maybe pemission denied, Please Allow");
+
+    // for (let connid in this._peerConnections)
+    //   this._serverFn(
+    //     JSON.stringify({
+    //       screenShareTrackId: this._isVideoMuted
+    //         ? "CAMERA OFF"
+    //         : "CAMERA ON-" + this._videoTrack?.id,
+    //     }),
+    //     connid
+    //   );
+    // }
+    // this._isScreenShareMuted = false;
   }
 
+  stopScreenShare() {
+    this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
+    this._emitScreenShareState(false);
+    this._isScreenShareMuted = true;
+    for (let connid in this._peerConnections)
+      this._serverFn(
+        JSON.stringify({
+          screenShareOff: true,
+        }),
+        connid
+      );
+  }
 
-
-  // for (let connid in this._peerConnections)
-  //   this._serverFn(
-  //     JSON.stringify({
-  //       screenShareTrackId: this._isVideoMuted
-  //         ? "CAMERA OFF"
-  //         : "CAMERA ON-" + this._videoTrack?.id,
-  //     }),
-  //     connid
-  //   );
-  // }
-  // this._isScreenShareMuted = false;
-}
-
-stopScreenShare() {
-  this._ClearScreenVideoStreams(this._rtpScreenShareSenders);
-  this._emitScreenShareState(false);
-  this._isScreenShareMuted = true;
-  for (let connid in this._peerConnections)
-    this._serverFn(
-      JSON.stringify({
-       screenShareOff: true
-      }),
-      connid
-    );
-}
-
-  async toggleScreenShare() {
-  if (this._isScreenShareMuted) await this.startScreenShare();
-  else this.stopScreenShare();
-}
+  async toggleScreenShare(
+    screenConfig: { video: boolean | { width: number; height: number; }; audio: boolean; } = {
+      video: true,
+      audio: false,
+    }
+  ) {
+    if (this._isScreenShareMuted) await this.startScreenShare(screenConfig);
+    else this.stopScreenShare();
+  }
 
   async startAudio() {
-  try {
-    if (!this._audioTrack) {
-      let audioStream = await navigator.mediaDevices.getUserMedia({
-        video: false,
-        audio: true,
-      });
-      this._audioTrack = audioStream.getAudioTracks()[0];
-    }
+    try {
+      if (!this._audioTrack) {
+        let audioStream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: true,
+        });
+        this._audioTrack = audioStream.getAudioTracks()[0];
+      }
 
-    if (this._isAudioMuted) {
-      this._audioTrack.enabled = true;
-      this._isAudioMuted = false;
-      this._AlterAudioVideoSenders(this._audioTrack, this._rtpAudioSenders);
-      this._emitAudioState(true);
+      if (this._isAudioMuted) {
+        this._audioTrack.enabled = true;
+        this._isAudioMuted = false;
+        this._AlterAudioVideoSenders(this._audioTrack, this._rtpAudioSenders);
+        this._emitAudioState(true);
+      }
+    } catch (e) {
+      console.log(e);
+      this._emitError(
+        "Failed to start audio,maybe pemission denied, Please Allow"
+      );
     }
-  } catch (e) {
-    console.log(e);
-    this._emitError("Failed to start audio,maybe pemission denied, Please Allow");
   }
-}
 
   async stopAudio() {
-  if (this._audioTrack) {
-    this._audioTrack.enabled = false;
-    this._isAudioMuted = true;
-    this._RemoveAudioVideoSenders(this._rtpAudioSenders);
-    this._emitAudioState(false);
+    if (this._audioTrack) {
+      this._audioTrack.enabled = false;
+      this._isAudioMuted = true;
+      this._RemoveAudioVideoSenders(this._rtpAudioSenders);
+      this._emitAudioState(false);
+    }
   }
-}
   async toggleAudio() {
-  if (this._isAudioMuted) await this.startAudio();
-  else await this.stopAudio();
-}
+    if (this._isAudioMuted) await this.startAudio();
+    else await this.stopAudio();
+  }
 
-isLocalAudioOn() {
-  return !this._isAudioMuted;
-}
+  isLocalAudioOn() {
+    return !this._isAudioMuted;
+  }
 
-isLocalVideoOn() {
-  return !this._isVideoMuted;
-}
+  isLocalVideoOn() {
+    return !this._isVideoMuted;
+  }
 
-isLocalScreenShareOn() {
-  return !this._isScreenShareMuted;
-}
+  isLocalScreenShareOn() {
+    return !this._isScreenShareMuted;
+  }
 
-// callback handlers
-onError(fn: Function) {
-  this._onError.push(fn);
-}
-_emitError(error: any) {
-  this._onError.forEach((fn) => fn(error));
-}
+  // callback handlers
+  onError(fn: Function) {
+    this._onError.push(fn);
+  }
+  _emitError(error: any) {
+    this._onError.forEach((fn) => fn(error));
+  }
 }
