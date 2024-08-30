@@ -197,7 +197,6 @@ export class WebrtcBase {
                 (Date.now() - this._fileStates[fileid].lastTimeStamp),
               lastTimeStamp: Date.now(),
             };
-            this._emitFileStateChange(fileid);
             console.log(
               this._fileStates[fileid].completedSize ==
                 this._fileStates[fileid].totalSize
@@ -215,7 +214,10 @@ export class WebrtcBase {
                 this._fileStates[fileid],
                 objectURL
               );
+              return;
             }
+            this._emitFileStateChange(fileid);
+
           };
           this._fileTransferingDataChennels[fileid].onerror = (event) => {
             console.log(connid + "file data channel onerror", event);
@@ -858,7 +860,7 @@ export class WebrtcBase {
                 (Date.now() - this._fileStates[data.fileId].lastTimeStamp),
               lastTimeStamp: Date.now(),
             };
-            this._emitFileStateChange(data.fileId);
+            
             if (
               this._fileStates[data.fileId].completedSize <
               this._fileStates[data.fileId].totalSize
@@ -882,7 +884,10 @@ export class WebrtcBase {
                 this._fileStates[data.fileId],
                 objectURL
               );
+
+              return;
             }
+            this._emitFileStateChange(data.fileId);
           }
         };
         const readSlice = (size: number) => {

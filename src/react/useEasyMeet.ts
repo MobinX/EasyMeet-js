@@ -323,6 +323,7 @@ export const useEasyMeet = (
 
   const sendFile = useCallback((to: string, file: File) => {
     if (webRTCBaseRef.current) {
+      console.log("sendFile", to, file);
       webRTCBaseRef.current.sendFile(to, file);
     } else {
       setError({ type: "sys-error", message: "Webrtc System is not ready" });
