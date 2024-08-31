@@ -879,7 +879,7 @@ export class WebrtcBase {
                 this._fileTransferingDataChennels[data.fileId]!.bufferedAmount
               );
 
-              let objectURL = URL.createObjectURL(contentArrayblob);
+              let objectURL = URL.createObjectURL(this._pendingFiles[data.fileId]);
               this._emitFileTransferCompleted(
                 this._fileStates[data.fileId],
                 objectURL
