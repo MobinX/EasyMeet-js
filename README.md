@@ -3,6 +3,9 @@
 
 **EasyMeetjs** is a robust and versatile TypeScript library that provides a solid foundation for building WebRTC-based applications. It simplifies the complexities of WebRTC, enabling developers to easily incorporate real-time communication features into their projects.From simple audio video calling to real time peer to peer file transfer , everything can be done in just 40 lines! 😉😉
 
+## Demo app implemented using this library
+ [MeetUp ->  https://meetupx.vercel.app/](https://meetupx.vercel.app/)
+
 ## Key Features:
 
 * **Peer-to-Peer Connection Management:** Seamlessly handles the creation, management, and closure of WebRTC peer connections, facilitating direct communication between users.
